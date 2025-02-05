@@ -1,0 +1,4 @@
+httpx~=0.28.1
+sentinels~=1.0.0
+pytest~=8.3.4
+pytest-httpx~=0.35.0
