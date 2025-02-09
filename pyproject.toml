@@ -41,6 +41,9 @@ testpaths = [
 
 [tool.hatch.version]
 path = 'mhanndalorian_bot/version.py'
+method = "semantic"
+style = "pep440"
+vsc = "git"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
