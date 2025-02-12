@@ -56,6 +56,15 @@ class API(MBot):
         else:
             return {"msg": "Unexpected result", "reason": result.content.decode()}
 
+    def fetch_twlogs(self):
+        return self.fetch_data(EndPoint.TWLOGS)
+
+    def fetch_tblogs(self):
+        return self.fetch_data(EndPoint.TBLOGS)
+
+    def fetch_inventory(self):
+        return self.fetch_data(EndPoint.INVENTORY)
+
     async def fetch_data_async(self, endpoint: str | EndPoint,
                                *, method: Optional[str] = None, hmac: Optional[bool] = None) -> Dict[Any, Any]:
         """Return data from the provided API endpoint using asynchronous HTTP requests

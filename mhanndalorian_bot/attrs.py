@@ -2,11 +2,14 @@
 Attribute definitions
 """
 
+import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any
 
 __all__ = ["APIKey", "AllyCode", "Debug", "HMAC", "Headers", "Payload", "EndPoint"]
+
+logger = logging.getLogger(__name__)
 
 
 class ManagedAttribute(ABC):
@@ -19,6 +22,7 @@ class ManagedAttribute(ABC):
 
     def __set__(self, obj, value):
         self.validate(value)
+        logger.debug(f"Setting {self.private_name!r} to {value!r} for object {obj!r}")
         setattr(obj, self.private_name, value)
 
     @abstractmethod
@@ -44,7 +48,8 @@ class AllyCode(ManagedAttribute):
     def validate(self, value):
         if not isinstance(value, str):
             raise AttributeError(f"{value} must be a string, not type:{type(value)}")
-        value = value.replace('-', '') if '-' in value else value
+        if not value.isdigit() or len(value) != 9:
+            raise AttributeError(f"Invalid allyCode ({value}): Value must be exactly 9 numerical characters.")
 
 
 class DiscordId(ManagedAttribute):

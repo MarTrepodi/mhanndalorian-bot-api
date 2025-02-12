@@ -14,7 +14,7 @@ from typing import Any, Optional
 import httpx
 from sentinels import Sentinel
 
-from .attrs import APIKey, AllyCode, Debug, EndPoint, HMAC, Headers, Payload
+from .attrs import APIKey, AllyCode, EndPoint
 
 # Define sentinels used in parameter checking
 NotSet = Sentinel('NotSet')
@@ -30,6 +30,7 @@ class MBot:
     Keyword Args
         api_host: Optional host URL for MHanndalorian Bot API, defaults to https://mhanndalorianbot.work/
         hmac: Boolean flag indicating whether the endpoints should use HMAC signature authentication, Default: True
+        debug: Boolean flag indicating whether debug logging should be enabled, Default: False
     """
 
     api_host: str = "https://mhanndalorianbot.work"
@@ -39,23 +40,24 @@ class MBot:
     console_handler.setLevel(logging.DEBUG)
     logger.addHandler(console_handler)
 
-    debug = Debug(False)
-    hmac = HMAC(True)
-    api_key: str = APIKey()
-    allycode: str = AllyCode()
+    debug = False
+    hmac = True
+    api_key = APIKey()
+    allycode = AllyCode()
 
-    client: httpx.Client = httpx.Client(base_url=f"{api_host}", timeout=15, verify=False)
-    aclient: httpx.AsyncClient = httpx.AsyncClient(base_url=f"{api_host}", timeout=15, verify=False)
+    headers = {"Content-Type": "application/json"}
+    payload = {"payload": {"allyCode": ""}}
 
-    def __init__(self, api_key: str, allycode: str, *, api_host: Optional[str] = None, hmac: Optional[bool] = True):
+    client: httpx.Client = httpx.Client(base_url=f"{api_host}", timeout=75, verify=False)
+    aclient: httpx.AsyncClient = httpx.AsyncClient(base_url=f"{api_host}", timeout=75, verify=False)
 
-        self.api_key = api_key
-        self.allycode = allycode
-        self.headers = Headers({"Content-Type": "application/json", "api-key": self.api_key})
-        self.payload = Payload({"payload": {"allyCode": self.allycode}})
+    def __init__(self, api_key: str, allycode: str, *, api_host: Optional[str] = None, hmac: Optional[bool] = True,
+                 debug: Optional[bool] = False):
 
-        # self.set_api_key(api_key)
-        # self.set_allycode(allycode)
+        self.set_api_key(api_key)
+        self.set_allycode(allycode)
+
+        self.debug = debug
 
         if isinstance(api_host, str):
             self.set_api_host(api_host)
@@ -89,7 +91,7 @@ class MBot:
 
     def get_api_key(self):
         """Return masked API key for logging purposes."""
-        return f"{'*' * 6 + self.api_key[-8:]}"
+        return f"{'*' * 4 + self.api_key[-4:]}"
 
     def set_api_key(self, api_key: str):
         """Set the api_key value for the container class and update relevant attributes (including headers)"""
@@ -100,7 +102,6 @@ class MBot:
         setattr(self, "api_key", api_key)
 
         self.headers["api-key"] = self.api_key
-        self.payload["payload"]["allyCode"] = self.allycode
         self.client.headers = self.headers
         self.aclient.headers = self.headers
 
@@ -113,23 +114,21 @@ class MBot:
 
         self.payload["payload"]["allyCode"] = allycode
 
-    @classmethod
-    def set_api_host(cls, api_host: str):
+    def set_api_host(self, api_host: str):
         """Set the api_host value for the container class and update relevant attributes"""
 
         if not isinstance(api_host, str):
             raise ValueError("api_host must be a string")
 
-        setattr(cls, "api_host", api_host)
+        setattr(self, "api_host", api_host)
 
-        cls.client.base_url = f"{api_host}/api/"
-        cls.aclient.base_url = f"{api_host}/api/"
+        self.client.base_url = f"{api_host}/api/"
+        self.aclient.base_url = f"{api_host}/api/"
 
-    @classmethod
-    def set_client(cls, **kwargs: Any):
+    def set_client(self, **kwargs: Any):
         """Set the client values for the container class and update relevant attributes"""
         for key, value in kwargs.items():
-            setattr(cls.client, key, value)
+            setattr(self.client, key, value)
 
     def sign(self, method: str, endpoint: str | EndPoint, payload: dict[str, Any] | Sentinel = NotSet, *,
              timestamp: str = None, api_key: str = None) -> None:
