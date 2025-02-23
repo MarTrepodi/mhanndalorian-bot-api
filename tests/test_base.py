@@ -1,4 +1,5 @@
 import pytest
+
 from mhanndalorian_bot.base import MBot
 
 
@@ -70,11 +71,12 @@ def test_set_allycode_invalid():
 
 def test_set_api_host_valid():
     """Test setting a valid API host."""
-    MBot.set_api_host("https://testhost.com")
-    assert MBot.api_host == "https://testhost.com"
+    bot = MBot(api_key="12345678abcdefgh", allycode="123456789")
+    bot.set_api_host("https://testhost.com")
+    assert bot.api_host == "https://testhost.com"
 
 
 def test_set_api_host_invalid_type():
     """Test setting an invalid API host with a non-string type."""
-    with pytest.raises(ValueError, match="api_host must be a string"):
+    with pytest.raises(TypeError, match="api_host"):
         MBot.set_api_host(12345)

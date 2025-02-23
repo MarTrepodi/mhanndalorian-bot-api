@@ -32,6 +32,8 @@ dependencies = [
 [tool.pytest.ini_options]
 minversion = "6.0"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "module"
+asyncio_default_test_loop_scope = "class"
 addopts = [
     "--import-mode=importlib",
 ]

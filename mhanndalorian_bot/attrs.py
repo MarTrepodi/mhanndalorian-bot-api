@@ -9,7 +9,9 @@ from typing import Any
 
 __all__ = ["APIKey", "AllyCode", "Debug", "HMAC", "Headers", "Payload", "EndPoint"]
 
-logger = logging.getLogger(__name__)
+from mhanndalorian_bot.config import Config
+
+logger: logging.Logger = Config.logger
 
 
 class ManagedAttribute(ABC):
@@ -40,7 +42,7 @@ class APIKey(ManagedAttribute):
             raise AttributeError(f"{value} must be a string, not type:{type(value)}")
 
 
-class AllyCode(ManagedAttribute):
+class AllyCode(ManagedAttribute, str):
 
     def __init__(self, allycode=None):
         self.allycode = allycode
@@ -123,6 +125,8 @@ class EndPoint(Enum):
     TB = "tb"
     TBLOGS = "tblogs"
     EVENTS = "events"
+    LEADERBOARD = "leaderboard"
+    ARENA = "leaderboard"
 
     # Player Registry endpoints
     FETCH = "database"

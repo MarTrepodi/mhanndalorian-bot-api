@@ -5,7 +5,7 @@ from pytest_httpx import HTTPXMock
 from mhanndalorian_bot.api import API
 from mhanndalorian_bot.attrs import EndPoint
 
-api_instance = API("mock_api_key", "mock_allycode")
+api_instance = API("mock_api_key", "123456789")
 
 
 def test_mock_fetch_data_sync(httpx_mock: HTTPXMock):

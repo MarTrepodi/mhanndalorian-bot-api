@@ -7,7 +7,7 @@ from mhanndalorian_bot.registry import Registry
 @pytest.fixture(scope="package", autouse=True)
 def registry_instance():
     """Fixture to create a Registry instance for testing."""
-    return Registry(api_key="test_api_key", allycode="123456789")
+    return Registry(api_key="test_api_key", allycode="123456789", discord_id="123456789987654321")
 
 
 def test_mock_fetch_player_valid_allycode(httpx_mock: HTTPXMock, registry_instance):

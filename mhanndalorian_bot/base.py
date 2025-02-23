@@ -14,7 +14,8 @@ from typing import Any, Optional
 import httpx
 from sentinels import Sentinel
 
-from .attrs import APIKey, AllyCode, EndPoint
+from mhanndalorian_bot.attrs import APIKey, AllyCode, EndPoint
+from mhanndalorian_bot.utils import func_debug_logger, func_timer
 
 # Define sentinels used in parameter checking
 NotSet = Sentinel('NotSet')
@@ -26,6 +27,8 @@ class MBot:
     Args
         api_key: MHanndalorian Bot API key as a string
         allycode: Player allycode as a string
+        discord_id: Discord user ID as a string. This is used to identify the source of requests made on behalf
+                    of another player.
 
     Keyword Args
         api_host: Optional host URL for MHanndalorian Bot API, defaults to https://mhanndalorianbot.work/
@@ -34,11 +37,7 @@ class MBot:
     """
 
     api_host: str = "https://mhanndalorianbot.work"
-    logger: logging.Logger = logging.getLogger("mbot")
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    logger.addHandler(console_handler)
+    logger: logging.Logger = logging.getLogger(__name__)
 
     debug = False
     hmac = True
@@ -51,8 +50,8 @@ class MBot:
     client: httpx.Client = httpx.Client(base_url=f"{api_host}", timeout=75, verify=False)
     aclient: httpx.AsyncClient = httpx.AsyncClient(base_url=f"{api_host}", timeout=75, verify=False)
 
-    def __init__(self, api_key: str, allycode: str, *, api_host: Optional[str] = None, hmac: Optional[bool] = True,
-                 debug: Optional[bool] = False):
+    def __init__(self, api_key: str, allycode: str, discord_id: Optional[str] = None, *, api_host: Optional[str] = None,
+                 hmac: Optional[bool] = True, debug: Optional[bool] = False):
 
         self.set_api_key(api_key)
         self.set_allycode(allycode)
@@ -66,6 +65,7 @@ class MBot:
             self.hmac = hmac
 
     @staticmethod
+    @func_debug_logger
     def cleanse_allycode(allycode: str) -> str:
         """Remove any dashes from provided string and verify the result contains exactly 9 digits"""
         if not isinstance(allycode, str):
@@ -79,6 +79,7 @@ class MBot:
         return allycode
 
     @staticmethod
+    @func_debug_logger
     def cleanse_discord_id(discord_id: str) -> str:
         """Validate that discord ID is an 18 character string of only numerical digits"""
         if not isinstance(discord_id, str):
@@ -93,6 +94,7 @@ class MBot:
         """Return masked API key for logging purposes."""
         return f"{'*' * 4 + self.api_key[-4:]}"
 
+    @func_debug_logger
     def set_api_key(self, api_key: str):
         """Set the api_key value for the container class and update relevant attributes (including headers)"""
 
@@ -105,6 +107,7 @@ class MBot:
         self.client.headers = self.headers
         self.aclient.headers = self.headers
 
+    @func_debug_logger
     def set_allycode(self, allycode: str):
         """Set the allycode value for the container class and update relevant attributes"""
 
@@ -114,6 +117,15 @@ class MBot:
 
         self.payload["payload"]["allyCode"] = allycode
 
+    @func_debug_logger
+    def set_discord_id(self, discord_id: str):
+        """Set the discord_id value for the container class and update relevant attributes"""
+
+        discord_id = self.cleanse_discord_id(discord_id)
+
+        self.headers['x-discord-id'] = discord_id
+
+    @func_debug_logger
     def set_api_host(self, api_host: str):
         """Set the api_host value for the container class and update relevant attributes"""
 
@@ -122,14 +134,17 @@ class MBot:
 
         setattr(self, "api_host", api_host)
 
-        self.client.base_url = f"{api_host}/api/"
-        self.aclient.base_url = f"{api_host}/api/"
+        self.client.base_url = f"{api_host}"
+        self.aclient.base_url = f"{api_host}"
 
+    @func_debug_logger
     def set_client(self, **kwargs: Any):
         """Set the client values for the container class and update relevant attributes"""
         for key, value in kwargs.items():
             setattr(self.client, key, value)
 
+    @func_timer
+    @func_debug_logger
     def sign(self, method: str, endpoint: str | EndPoint, payload: dict[str, Any] | Sentinel = NotSet, *,
              timestamp: str = None, api_key: str = None) -> None:
         """Create HMAC signature for request

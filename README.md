@@ -33,7 +33,7 @@ resp = mbot.fetch_data(endpoint=EndPoint.INVENTORY)
 ```python
 from mhanndalorian_bot import Registry
 
-mbot = Registry(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
+mbot = Registry(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOUR DISCORD USER ID>)
 
 resp = mbot.fetch_player(allycode=<PLAYER ALLYCODE>)
 ```
@@ -82,7 +82,7 @@ import asyncio
 from mhanndalorian_bot import Registry
 
 async def main():
-    reg = Registry(api_key, allycode)
+    reg = Registry(api_key=<YOUR API KEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOUR DISCORD USER ID>)
 
     # Returns 'None' if player does not exist in the registry
     fetch_resp = await reg.fetch_player_async(allycode)
