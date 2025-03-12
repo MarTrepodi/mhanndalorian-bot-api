@@ -78,6 +78,14 @@ class API(MBot):
         """Return data from the player squad and fleet arena endpoint"""
         return self.fetch_data(EndPoint.ARENA)
 
+    def fetch_tb(self):
+        """Return data from the TB endpoint for the currently active Territory Battle guild event"""
+        return self.fetch_data(EndPoint.TB)
+
+    def fetch_raid(self):
+        """Return data from the ACTIVERAID endpoint for the currently active raid guild event"""
+        return self.fetch_data(EndPoint.RAID)
+
     # Async methods
     @func_timer
     async def fetch_data_async(self, endpoint: str | EndPoint,

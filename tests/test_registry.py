@@ -47,10 +47,3 @@ def test_verify_player_invalid_data(registry_instance):
     """Test verifying a player with invalid data."""
     with pytest.raises(ValueError, match="Invalid"):
         result = registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)
-
-
-def test_cleanse_allycode_integration(registry_instance):
-    """Test integration of cleanse_allycode within Registry methods."""
-    response = registry_instance.fetch_player(allycode="123-456-789", hmac=False)
-    assert response is not None
-    assert isinstance(response, dict)

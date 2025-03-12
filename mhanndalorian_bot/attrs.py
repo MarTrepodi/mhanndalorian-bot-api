@@ -124,6 +124,7 @@ class EndPoint(Enum):
     INVENTORY = "inventory"
     TB = "tb"
     TBLOGS = "tblogs"
+    TBHISTORY = "tbleaderboardhistory"
     EVENTS = "events"
     LEADERBOARD = "leaderboard"
     ARENA = "leaderboard"
