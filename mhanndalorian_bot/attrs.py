@@ -128,6 +128,8 @@ class EndPoint(Enum):
     EVENTS = "events"
     LEADERBOARD = "leaderboard"
     ARENA = "leaderboard"
+    PLAYER = "player"
+    GUILD = "guild"
 
     # Player Registry endpoints
     FETCH = "database"
