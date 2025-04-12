@@ -106,12 +106,35 @@ class API(MBot):
         if allycode is None:
             allycode = self.allycode
         else:
+            if not isinstance(allycode, str):
+                raise TypeError("allycode must be a string")
             self.allycode = allycode
-        return self.fetch_data(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
 
-    def fetch_guild(self, guild: str | None = None):
+        player = self.fetch_data(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
+
+        if isinstance(player, dict):
+            if 'events' in player:
+                return player['events']
+            else:
+                return player
+        else:
+            return player
+
+    def fetch_guild(self, guild_id: str):
         """Return data from the GUILD endpoint for the provided guild"""
-        return self.fetch_data(EndPoint.GUILD, payload={"guild": guild})
+        if not isinstance(guild_id, str):
+            raise TypeError("guild_id must be a string")
+
+        guild = self.fetch_data(EndPoint.GUILD, payload={"guildId": guild_id})
+
+        if isinstance(guild, dict):
+            if 'events' in guild:
+                if 'guild' in guild['events']:
+                    return guild['events']['guild']
+            else:
+                return guild
+        else:
+            return guild
 
     # Async methods
     @func_timer
@@ -195,14 +218,32 @@ class API(MBot):
         if allycode is None:
             allycode = self.allycode
         else:
+            if not isinstance(allycode, str):
+                raise TypeError("allycode must be a string")
             self.allycode = allycode
 
-        return await self.fetch_data_async(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
+        player = await self.fetch_data_async(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
 
-    async def fetch_guild_async(self, guild: Optional[str] = None):
-        """Return data from the GUILD endpoint for the provided guild"""
-        if guild is None:
-            guild = self.allycode
+        if isinstance(player, dict):
+            if 'events' in player:
+                return player['events']
+            else:
+                return player
         else:
-            guild = guild
-        return await self.fetch_data_async(EndPoint.GUILD, payload={"guild": guild})
+            return player
+
+    async def fetch_guild_async(self, guild_id: str):
+        """Return data from the GUILD endpoint for the provided guild"""
+        if not isinstance(guild_id, str):
+            raise TypeError("guild_id must be a string")
+
+        guild = await self.fetch_data_async(EndPoint.GUILD, payload={"guildId": guild_id})
+
+        if isinstance(guild, dict):
+            if 'events' in guild:
+                if 'guild' in guild['events']:
+                    return guild['events']['guild']
+            else:
+                return guild
+        else:
+            return guild
