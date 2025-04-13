@@ -97,6 +97,10 @@ class API(MBot):
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
         return self.fetch_data(EndPoint.TB)
 
+    def fetch_tw(self):
+        """Return data from the TW endpoint for the currently active Territory War guild event"""
+        return self.fetch_data(EndPoint.TW)
+
     def fetch_raid(self):
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event"""
         return self.fetch_data(EndPoint.RAID)
@@ -208,6 +212,10 @@ class API(MBot):
     async def fetch_tb_async(self):
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
         return await self.fetch_data_async(EndPoint.TB)
+
+    async def fetch_tw_async(self):
+        """Return data from the TW endpoint for the currently active Territory War guild event"""
+        return await self.fetch_data_async(EndPoint.TW)
 
     async def fetch_raid_async(self):
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event"""
