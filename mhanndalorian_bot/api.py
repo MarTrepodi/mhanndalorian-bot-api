@@ -21,6 +21,29 @@ class API(MBot):
 
     logger = logging.getLogger(__name__)
 
+    @staticmethod
+    def _resolve_endpoint(ep: Union[EndPoint, str]) -> str:
+        """Convert the given endpoint to its string representation."""
+        return f"/api/{ep.value}" if isinstance(ep, EndPoint) else f"/api/{ep}"
+
+    @staticmethod
+    def _verify_allycode(allycode: str) -> str:
+        """Verify that the provided allycode is a string and is not empty."""
+        if not isinstance(allycode, str):
+            raise TypeError("allycode must be a string")
+        if not allycode:
+            raise ValueError("allycode cannot be empty")
+        return allycode
+
+    @staticmethod
+    def _verify_guild_id(guild_id: str) -> str:
+        """Verify that the provided guild_id is a string and is not empty."""
+        if not isinstance(guild_id, str):
+            raise TypeError("guild_id must be a string")
+        if not guild_id:
+            raise ValueError("guild_id cannot be empty")
+        return guild_id
+
     @func_timer
     def fetch_data(
             self,
@@ -43,39 +66,36 @@ class API(MBot):
             Returns
                 Dictionary from JSON response, if found.
         """
-        if isinstance(endpoint, EndPoint):
-            endpoint = f"/api/{endpoint.value}"
-        elif isinstance(endpoint, str):
-            endpoint = f"/api/{endpoint}"
 
-        method = method.upper() if method else "POST"
+        endpoint = self._resolve_endpoint(endpoint)
+        method = (method or "POST").upper()
+        is_hmac_signed = hmac if hmac is not None else self.hmac
+        payload = payload or self.payload
 
-        if isinstance(hmac, bool):
-            signed = hmac
-        else:
-            signed = self.hmac
+        self.logger.debug(
+                f"Preparing API call - Endpoint: {endpoint}, Method: {method}, HMAC: {is_hmac_signed}, "
+                + f"Payload: {payload}"
+                )
 
-        if payload is not None:
-            payload = payload
-        else:
-            payload = self.payload
-
-        self.logger.debug(f"Endpoint: {endpoint}, Method: {method}, HMAC: {signed}")
-        self.logger.debug(f"  Payload: {payload}")
-
-        if signed:
-            self.logger.debug(f"Calling HMAC signing method ...")
+        if is_hmac_signed:
+            self.logger.debug("HMAC signing is required. Calling 'sign' method.")
             self.sign(method=method, endpoint=endpoint, payload=payload)
 
+        # HTTP call happens here
         result = self.client.post(endpoint, json=payload)
 
-        self.logger.debug(f"HTTP request headers: {result.request.headers}")
-        self.logger.debug(f"API instance headers attribute: {self.headers}")
+        self.logger.debug(
+                f"HTTP request completed - Status: {result.status_code}, Headers: {result.request.headers}"
+                )
 
         if result.status_code == 200:
             return result.json()
         else:
             raise RuntimeError(f"Unexpected result: {result.content.decode()}")
+
+    def fetch_tw_leaderboard(self):
+        """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event"""
+        return self.fetch_data(EndPoint.TWLEADERBOARD)
 
     def fetch_twlogs(self):
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event"""
@@ -107,36 +127,21 @@ class API(MBot):
 
     def fetch_player(self, allycode: Optional[str] = None):
         """Return data from the PLAYER endpoint for the provided allycode"""
-        if allycode is None:
-            allycode = self.allycode
-        else:
-            if not isinstance(allycode, str):
-                raise TypeError("allycode must be a string")
-            self.allycode = allycode
+        validated_allycode = self._verify_allycode(allycode) if allycode else self.allycode
+        player = self.fetch_data(EndPoint.PLAYER, payload={"payload": {"allyCode": validated_allycode}})
 
-        player = self.fetch_data(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
-
-        if isinstance(player, dict):
-            if 'events' in player:
-                return player['events']
-            else:
-                return player
+        if isinstance(player, dict) and 'events' in player:
+            return player['events']
         else:
             return player
 
     def fetch_guild(self, guild_id: str):
         """Return data from the GUILD endpoint for the provided guild"""
-        if not isinstance(guild_id, str):
-            raise TypeError("guild_id must be a string")
+        validated_guild_id = self._verify_guild_id(guild_id)
+        guild = self.fetch_data(EndPoint.GUILD, payload={"guildId": validated_guild_id})
 
-        guild = self.fetch_data(EndPoint.GUILD, payload={"guildId": guild_id})
-
-        if isinstance(guild, dict):
-            if 'events' in guild:
-                if 'guild' in guild['events']:
-                    return guild['events']['guild']
-            else:
-                return guild
+        if isinstance(guild, dict) and 'events' in guild and 'guild' in guild['events']:
+            return guild['events']['guild']
         else:
             return guild
 
@@ -163,35 +168,34 @@ class API(MBot):
             Returns
                 httpx.Response object
         """
-        if isinstance(endpoint, EndPoint):
-            endpoint = f"/api/{endpoint.value}"
-        elif isinstance(endpoint, str):
-            endpoint = f"/api/{endpoint}"
+        endpoint = self._resolve_endpoint(endpoint)
+        method = (method or "POST").upper()
+        is_hmac_signed = hmac if hmac is not None else self.hmac
+        payload = payload or self.payload
 
-        method = method.upper() if method else "POST"
+        self.logger.debug(
+                f"Preparing API call - Endpoint: {endpoint}, Method: {method}, HMAC: {is_hmac_signed}, "
+                + f"Payload: {payload}"
+                )
 
-        if isinstance(hmac, bool):
-            signed = hmac
-        else:
-            signed = self.hmac
-
-        if payload is not None:
-            payload = payload
-        else:
-            payload = self.payload
-
-        self.logger.debug(f"Endpoint: {endpoint}, Method: {method}, HMAC: {signed}")
-        self.logger.debug(f"  Payload: {payload}")
-
-        if signed:
+        if is_hmac_signed:
+            self.logger.debug("HMAC signing is required. Calling 'sign' method.")
             self.sign(method=method, endpoint=endpoint, payload=payload)
 
         result = await self.aclient.post(endpoint, json=payload)
+
+        self.logger.debug(
+                f"HTTP request completed - Status: {result.status_code}, Headers: {result.request.headers}"
+                )
 
         if result.status_code == 200:
             return result.json()
         else:
             raise RuntimeError(f"Unexpected result: {result.content.decode()}")
+
+    async def fetch_tw_leaderboard_async(self):
+        """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event"""
+        return await self.fetch_data_async(EndPoint.TWLEADERBOARD)
 
     async def fetch_twlogs_async(self):
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event"""
@@ -223,35 +227,20 @@ class API(MBot):
 
     async def fetch_player_async(self, allycode: Optional[str] = None):
         """Return data from the PLAYER endpoint for the provided allycode"""
-        if allycode is None:
-            allycode = self.allycode
-        else:
-            if not isinstance(allycode, str):
-                raise TypeError("allycode must be a string")
-            self.allycode = allycode
+        validated_allycode = self._verify_allycode(allycode) if allycode else self.allycode
+        player = await self.fetch_data_async(EndPoint.PLAYER, payload={"payload": {"allyCode": validated_allycode}})
 
-        player = await self.fetch_data_async(EndPoint.PLAYER, payload={"payload": {"allyCode": allycode}})
-
-        if isinstance(player, dict):
-            if 'events' in player:
-                return player['events']
-            else:
-                return player
+        if isinstance(player, dict) and 'events' in player:
+            return player['events']
         else:
             return player
 
     async def fetch_guild_async(self, guild_id: str):
         """Return data from the GUILD endpoint for the provided guild"""
-        if not isinstance(guild_id, str):
-            raise TypeError("guild_id must be a string")
+        validated_guild_id = self._verify_guild_id(guild_id)
+        guild = await self.fetch_data_async(EndPoint.GUILD, payload={"guildId": validated_guild_id})
 
-        guild = await self.fetch_data_async(EndPoint.GUILD, payload={"guildId": guild_id})
-
-        if isinstance(guild, dict):
-            if 'events' in guild:
-                if 'guild' in guild['events']:
-                    return guild['events']['guild']
-            else:
-                return guild
+        if isinstance(guild, dict) and 'events' in guild and 'guild' in guild['events']:
+            return guild['events']['guild']
         else:
             return guild

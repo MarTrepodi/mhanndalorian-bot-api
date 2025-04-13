@@ -1,1 +1,3 @@
 /examples/
+/dump.rdb
+*.json
