@@ -65,6 +65,37 @@ class MBot:
             self.hmac = hmac
 
     @staticmethod
+    def human_time(unix_time: int | float) -> str:
+        """Convert unix time to human-readable string
+
+        Args:
+            unix_time (int|float): standard unix time in seconds or milliseconds
+
+        Returns:
+            str: human-readable time string
+
+        Notes:
+            If the provided unix time is invalid or an error occurs, the default time string returned
+            is 1970-01-01 00:00:00
+
+        """
+        if not isinstance(unix_time, (int, float)) or not unix_time:
+            err_msg = f"A valid integer or float 'unix_time' argument is required."
+            raise ValueError(err_msg)
+        from datetime import datetime, timezone
+        if isinstance(unix_time, float):
+            unix_time = int(unix_time)
+        if isinstance(unix_time, str):
+            try:
+                unix_time = int(unix_time)
+            except ValueError:
+                err_msg = f"Unable to convert unix time from {type(unix_time)} to type <int>"
+                raise ValueError(err_msg)
+        if len(str(unix_time)) >= 13:
+            unix_time /= 1000
+        return datetime.fromtimestamp(unix_time, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+    @staticmethod
     @func_debug_logger
     def cleanse_allycode(allycode: str) -> str:
         """Remove any dashes from provided string and verify the result contains exactly 9 digits"""
