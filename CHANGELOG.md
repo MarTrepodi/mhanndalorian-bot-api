@@ -1,5 +1,21 @@
 <!-- insertion marker -->
 
+## [v0.5.2](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.5.2) - 2025-04-13
+
+<small>[Compare with v0.5.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.5.1...v0.5.2)</small>
+
+### Features
+
+- add example scripts and README files for
+  usage ([63350b7](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/63350b75bf409206bd84a7096dbf9c73aacbf790)
+  by MarTrepodi).
+- add optional 'enums' parameter to API
+  methods ([6c78a07](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/6c78a072bdb1c76e8d37ade5bec88b588f772b62)
+  by MarTrepodi).
+- add human-readable unix time conversion
+  utility ([afb2001](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/afb2001f5ce8672cc3fc3d5c7b0812f50201a859)
+  by MarTrepodi).
+
 ## [v0.5.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.5.1) - 2025-04-13
 
 <small>[Compare with first commit](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/d8ca0c85027fde044efebcfd42923012183ec2d1...v0.5.1)</small>
