@@ -1,3 +1,4 @@
+# coding=utf-8
 """
 Attribute definitions
 """
@@ -130,6 +131,7 @@ class EndPoint(Enum):
     ARENA = "leaderboard"
     PLAYER = "player"
     GUILD = "guild"
+    SQUADS = "squadpresets"
 
     # Player Registry endpoints
     FETCH = "database"

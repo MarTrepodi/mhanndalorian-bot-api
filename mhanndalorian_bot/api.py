@@ -156,6 +156,10 @@ class API(MBot):
         else:
             return guild
 
+    def fetch_squad_presets(self, enums: bool = False):
+        """Return data from the SQUADPRESETS endpoint"""
+        return self.fetch_data(EndPoint.SQUADS, enums=enums)
+
     # Async methods
     @func_timer
     async def fetch_data_async(
@@ -266,3 +270,7 @@ class API(MBot):
             return guild['events']['guild']
         else:
             return guild
+
+    async def fetch_squad_presets_async(self, enums: bool = False):
+        """Return data from the SQUADPRESETS endpoint"""
+        return await self.fetch_data_async(EndPoint.SQUADS, enums=enums)

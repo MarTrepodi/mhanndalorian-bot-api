@@ -1,5 +1,15 @@
 <!-- insertion marker -->
 
+## [v0.6.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.6.0) - 2025-05-01
+
+<small>[Compare with v0.5.2](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.5.2...v0.6.0)</small>
+
+### Features
+
+- add example scripts and README files for
+  usage ([9421572](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/942157202fa58f632b2b3f9aa62aa24f5b6b092d)
+  by MarTrepodi).
+
 ## [v0.5.2](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.5.2) - 2025-04-13
 
 <small>[Compare with v0.5.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.5.1...v0.5.2)</small>
