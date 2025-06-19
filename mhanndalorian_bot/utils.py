@@ -1,3 +1,4 @@
+# coding=utf-8
 """
 Utility functions
 """
@@ -37,3 +38,29 @@ def func_debug_logger(f):
         return result
 
     return wrap
+
+
+def calc_tw_score_total(zone_status_list: list) -> int:
+    """
+    Calculates the total TW score from a list of zone status dictionaries.
+
+    The function takes a list of dictionaries containing zone status information
+    from the `fetch_tw()` method and computes the sum of the scores present in the
+    nested 'zoneStatus' key of each dictionary.
+
+    Args:
+        zone_status_list (list): A list of dictionaries where each dictionary
+            contains a 'zoneStatus' key that itself contains another dictionary
+            with a 'score' key.
+
+    Returns:
+        int: The total sum of scores extracted from the 'zoneStatus' key of each
+        dictionary in the input list.
+
+    Raises:
+        TypeError: If the input `zone_status_list` is not a list.
+    """
+    if not isinstance(zone_status_list, list):
+        raise TypeError("'zone_status' must be a list")
+
+    return sum([int(score['zoneStatus']['score']) for score in zone_status_list])

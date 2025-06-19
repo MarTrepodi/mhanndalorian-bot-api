@@ -160,6 +160,10 @@ class API(MBot):
         """Return data from the SQUADPRESETS endpoint"""
         return self.fetch_data(EndPoint.SQUADS, enums=enums)
 
+    def fetch_gac(self, enums: bool = False):
+        """Return data from the GAC endpoint"""
+        return self.fetch_data(EndPoint.GAC, enums=enums)
+
     # Async methods
     @func_timer
     async def fetch_data_async(
@@ -274,3 +278,7 @@ class API(MBot):
     async def fetch_squad_presets_async(self, enums: bool = False):
         """Return data from the SQUADPRESETS endpoint"""
         return await self.fetch_data_async(EndPoint.SQUADS, enums=enums)
+
+    async def fetch_gac_async(self, enums: bool = False):
+        """Return data from the GAC endpoint"""
+        return await self.fetch_data_async(EndPoint.GAC, enums=enums)
