@@ -1,3 +1,4 @@
+# coding=utf-8
 """
 Base class definition for core object for storing and sharing information for use by all modules
 """

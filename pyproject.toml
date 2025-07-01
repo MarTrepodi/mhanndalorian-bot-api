@@ -63,3 +63,19 @@ upload_to_release = false                                                    # a
 upload_to_pypi = false                                                       # don't auto-upload to PyPI
 remove_dist = false                                                          # don't remove dists
 patch_without_tag = true                                                     # patch release by default
+
+[tool.git-changelog]
+bump = "auto"
+convention = "angular"
+in-place = true
+marker-line = "<!-- insertion marker -->"
+output = "CHANGELOG.md"
+parse-refs = true
+parse-trailers = true
+provider = "github"
+repository = "."
+sections = "fix,feat,refactor,chore,doc,test"
+template = "keepachangelog"
+version-regex = "^## \\\\[(?P<version>v?[^\\\\]]+)"
+versioning = "semver"
+zerover = true

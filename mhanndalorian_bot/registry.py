@@ -28,22 +28,39 @@ class Registry(MBot):
                          api_host=api_host, hmac=hmac, debug=debug)
 
     @func_timer
-    def fetch_player(self, allycode: str, *, hmac: bool = False) -> Dict[Any, Any]:
+    def validate_arguments(self, allycode: str, discord_id: str) -> str:
+        """Validate provided arguments for the player registry service"""
+        if not allycode and not discord_id:
+            raise ValueError("At least one of allycode or discord_id must be provided.")
+
+        if allycode and discord_id:
+            raise ValueError("Only one of allycode or discord_id can be provided.")
+
+        allycode = self.cleanse_allycode(allycode) if allycode else None
+        discord_id = self.cleanse_discord_id(discord_id) if discord_id else None
+
+        return allycode or discord_id
+
+    @func_timer
+    def fetch_player(
+            self, *,
+            allycode: str | None = None,
+            discord_id: str | None = None,
+            hmac: bool = False
+            ) -> Dict[Any, Any]:
         """Return player data from the provided allycode
 
-            Args
-                allycode: Player allycode as a string.
-
             Keyword Args
+                allycode: Player allycode as a string.
+                discord_id: Discord user ID as a string.
                 hmac: Boolean flag to indicate use of HMAC request signing.
 
             Returns
                 Dictionary from JSON response, if found. Else None.
         """
 
-        allycode = self.cleanse_allycode(allycode)
-
-        payload = {'user': [allycode], 'endpoint': 'find'}
+        user_identifier = self.validate_arguments(allycode, discord_id)
+        payload = {'user': [user_identifier], 'endpoint': 'find'}
         endpoint = f"/api/{EndPoint.FETCH.value}"
 
         if hmac or self.hmac is True:
@@ -132,22 +149,25 @@ class Registry(MBot):
 
     # Async methods
     @func_timer
-    async def fetch_player_async(self, allycode: str, *, hmac: bool = False) -> Dict[Any, Any]:
+    async def fetch_player_async(
+            self, *,
+            allycode: str | None = None,
+            discord_id: str | None = None,
+            hmac: bool = False
+            ) -> Dict[Any, Any]:
         """Return player data from the provided allycode
 
-            Args
-                allycode: Player allycode as a string.
-
             Keyword Args
+                allycode: Player allycode as a string.
+                discord_id: Discord user ID as a string.
                 hmac: Boolean flag to indicate use of HMAC request signing.
 
             Returns
                 Dictionary from JSON response, if found. Else None.
         """
 
-        allycode = self.cleanse_allycode(allycode)
-
-        payload = {'user': [allycode], 'endpoint': 'find'}
+        user_identifier = self.validate_arguments(allycode, discord_id)
+        payload = {'user': [user_identifier], 'endpoint': 'find'}
         endpoint = f"/api/{EndPoint.FETCH.value}"
 
         if hmac or self.hmac is True:
