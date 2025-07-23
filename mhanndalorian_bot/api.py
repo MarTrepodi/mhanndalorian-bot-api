@@ -147,7 +147,7 @@ class API(MBot):
         validated_guild_id = self._verify_guild_id(guild_id)
         guild = self.fetch_data(
             endpoint=EndPoint.GUILD,
-            payload={"guildId": validated_guild_id},
+                payload={"payload": {"guildId": validated_guild_id}},
             enums=enums
             )
 
@@ -266,7 +266,7 @@ class API(MBot):
         validated_guild_id = self._verify_guild_id(guild_id)
         guild = await self.fetch_data_async(
             endpoint=EndPoint.GUILD,
-            payload={"guildId": validated_guild_id},
+                payload={"payload": {"guildId": validated_guild_id}},
             enums=enums
             )
 
