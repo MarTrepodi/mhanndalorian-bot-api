@@ -120,6 +120,10 @@ class API(MBot):
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
         return self.fetch_data(EndPoint.TB, enums=enums)
 
+    def fetch_tb_history(self, enums: bool = False) -> Dict[Any, Any]:
+        """Return data from the TBLEADERBOARDHISTORY endpoint"""
+        return self.fetch_data(EndPoint.TBHISTORY, enums=enums)
+
     def fetch_tw(self, enums: bool = False) -> Dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event"""
         return self.fetch_data(EndPoint.TW, enums=enums)
@@ -238,6 +242,10 @@ class API(MBot):
     async def fetch_tb_async(self, enums: bool = False) -> Dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
         return await self.fetch_data_async(EndPoint.TB, enums=enums)
+
+    async def fetch_tb_history_async(self, enums: bool = False) -> Dict[Any, Any]:
+        """Return data from the TBLEADERBOARDHISTORY endpoint"""
+        return await self.fetch_data_async(EndPoint.TBHISTORY, enums=enums)
 
     async def fetch_tw_async(self, enums: bool = False) -> Dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event"""
