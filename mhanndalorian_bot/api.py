@@ -73,7 +73,7 @@ class API(MBot):
         method = (method or "POST").upper()
         is_hmac_signed = hmac if hmac is not None else self.hmac
         payload = payload or self.payload
-        payload['enums'] = enums
+        payload['payload']['enums'] = enums
 
         self.logger.debug(
                 f"Preparing API call - Endpoint: {endpoint}, Method: {method}, HMAC: {is_hmac_signed}, "
