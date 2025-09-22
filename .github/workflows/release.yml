@@ -33,7 +33,7 @@ jobs:
       # Build the package using python3 -m build
       - name: Build the package
         run: |
-          python3 -m pip install --upgrade setuptools wheel
+          python3 -m pip install --upgrade setuptools wheel build
           python3 -m build
 
       # Tag the release in GitHub
