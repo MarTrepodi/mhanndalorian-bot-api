@@ -44,6 +44,8 @@ jobs:
           git config user.email "$(git log -n 1 --pretty=format:%ae)"
           git tag -a "v$VERSION" -m "Release version $VERSION"
           git push origin "v$VERSION"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     # Publish the package to PyPI
   pypi-publish:
