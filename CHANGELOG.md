@@ -1,5 +1,24 @@
 <!-- insertion marker -->
 
+## [v0.9.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.9.0) - 2025-11-15
+
+<small>[Compare with v0.8.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.8.1...v0.9.0)</small>
+
+### Bug Fixes
+
+- add discord_id support in bot initialization (
+  #2) ([11fa544](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/11fa544b30991aa8767e9c725c30c2cb0bd6d7dc) by
+  MarTrepodi).
+
+### Features
+
+- allow flexible kwargs in API
+  methods ([1d81014](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/1d810147034afc9f241ec93a8de4eee4a0a4938f)
+  by MarTrepodi).
+- automate changelog updates in release
+  workflow ([5ac0dc9](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/5ac0dc9bb707264b8cf219bd450087b51a22eeb3)
+  by MarTrepodi).
+
 ## [v0.8.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.8.1) - 2025-09-22
 
 <small>[Compare with v0.8.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.8.0...v0.8.1)</small>

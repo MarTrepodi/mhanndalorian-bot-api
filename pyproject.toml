@@ -23,7 +23,9 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
+    "hatchling>=1.27.0",
     "httpx",
+    "pytest>=8.4.2",
     "sentinels",
 ]
 
