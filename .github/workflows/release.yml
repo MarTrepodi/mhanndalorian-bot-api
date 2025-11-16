@@ -47,6 +47,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Update CHANGELOG.md
+      - name: Update CHANGELOG.md
+        run: |
+          python3 install git-changelog
+          git-changelog -B auto -Tio CHANGELOG.md -c angular -s build,deps,fix,feat,refactor -n semver 
+
     # Publish the package to PyPI
   pypi-publish:
     runs-on: ubuntu-latest

@@ -57,6 +57,9 @@ class MBot:
         self.set_api_key(api_key)
         self.set_allycode(allycode)
 
+        if discord_id:
+            self.set_discord_id(discord_id)
+
         self.debug = debug
 
         if isinstance(api_host, str):
