@@ -96,77 +96,89 @@ class API(MBot):
         else:
             raise RuntimeError(f"Unexpected result: {result.content.decode()}")
 
-    def fetch_tw_leaderboard(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_tw_leaderboard(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event"""
-        return self.fetch_data(EndPoint.TWLEADERBOARD, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.TWLEADERBOARD, **kwargs)
 
-    def fetch_twlogs(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_twlogs(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event"""
-        return self.fetch_data(EndPoint.TWLOGS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.TWLOGS, **kwargs)
 
-    def fetch_tblogs(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_tblogs(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event"""
-        return self.fetch_data(EndPoint.TBLOGS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.TBLOGS, **kwargs)
 
-    def fetch_inventory(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_inventory(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the player INVENTORY endpoint"""
-        return self.fetch_data(EndPoint.INVENTORY, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.INVENTORY, **kwargs)
 
-    def fetch_arena(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_arena(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint"""
-        return self.fetch_data(EndPoint.ARENA, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.ARENA, **kwargs)
 
-    def fetch_tb(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_tb(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
-        return self.fetch_data(EndPoint.TB, enums=enums)
+        return self.fetch_data(EndPoint.TB, **kwargs)
 
-    def fetch_tb_history(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_tb_history(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint"""
-        return self.fetch_data(EndPoint.TBHISTORY, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.TBHISTORY, **kwargs)
 
-    def fetch_tw(self, enums: bool = False) -> Dict[Any, Any]:
+    def fetch_tw(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event"""
-        return self.fetch_data(EndPoint.TW, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.TW, **kwargs)
 
-    def fetch_raid(self, enums: bool = False):
+    def fetch_raid(self, **kwargs):
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event"""
-        return self.fetch_data(EndPoint.RAID, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.RAID, **kwargs)
 
-    def fetch_player(self, allycode: Optional[str] = None, enums: bool = False):
+    def fetch_player(self, allycode: Optional[str] = None, **kwargs):
         """Return data from the PLAYER endpoint for the provided allycode"""
         validated_allycode = self._verify_allycode(allycode) if allycode else self.allycode
+        enums = kwargs.setdefault('enums', False)
         player = self.fetch_data(
-            endpoint=EndPoint.PLAYER,
-            payload={"payload": {"allyCode": validated_allycode}},
-            enums=enums
-            )
+                endpoint=EndPoint.PLAYER,
+                payload={"payload": {"allyCode": validated_allycode}},
+                enums=enums
+                )
 
         if isinstance(player, dict) and 'events' in player:
             return player['events']
         else:
             return player
 
-    def fetch_guild(self, guild_id: str, enums: bool = False):
+    def fetch_guild(self, guild_id: str, **kwargs):
         """Return data from the GUILD endpoint for the provided guild"""
         validated_guild_id = self._verify_guild_id(guild_id)
+        enums = kwargs.setdefault('enums', False)
         guild = self.fetch_data(
-            endpoint=EndPoint.GUILD,
+                endpoint=EndPoint.GUILD,
                 payload={"payload": {"guildId": validated_guild_id}},
-            enums=enums
-            )
+                enums=enums
+                )
 
         if isinstance(guild, dict) and 'events' in guild and 'guild' in guild['events']:
             return guild['events']['guild']
         else:
             return guild
 
-    def fetch_squad_presets(self, enums: bool = False):
+    def fetch_squad_presets(self, **kwargs):
         """Return data from the SQUADPRESETS endpoint"""
-        return self.fetch_data(EndPoint.SQUADS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.SQUADS, **kwargs)
 
-    def fetch_gac(self, enums: bool = False):
+    def fetch_gac(self, **kwargs):
         """Return data from the GAC endpoint"""
-        return self.fetch_data(EndPoint.GAC, enums=enums)
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.GAC, **kwargs)
 
     # Async methods
     @func_timer
@@ -219,74 +231,85 @@ class API(MBot):
         else:
             raise RuntimeError(f"Unexpected result: {result.content.decode()}")
 
-    async def fetch_tw_leaderboard_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_tw_leaderboard_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event"""
-        return await self.fetch_data_async(EndPoint.TWLEADERBOARD, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.TWLEADERBOARD, **kwargs)
 
-    async def fetch_twlogs_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_twlogs_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event"""
-        return await self.fetch_data_async(EndPoint.TWLOGS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.TWLOGS, **kwargs)
 
-    async def fetch_tblogs_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_tblogs_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event"""
-        return await self.fetch_data_async(EndPoint.TBLOGS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.TBLOGS, **kwargs)
 
-    async def fetch_inventory_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_inventory_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the player INVENTORY endpoint"""
-        return await self.fetch_data_async(EndPoint.INVENTORY, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.INVENTORY, **kwargs)
 
-    async def fetch_arena_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_arena_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint"""
-        return await self.fetch_data_async(EndPoint.ARENA, enums=enums)
+        return await self.fetch_data_async(EndPoint.ARENA, **kwargs)
 
-    async def fetch_tb_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_tb_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event"""
-        return await self.fetch_data_async(EndPoint.TB, enums=enums)
+        return await self.fetch_data_async(EndPoint.TB, **kwargs)
 
-    async def fetch_tb_history_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_tb_history_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint"""
-        return await self.fetch_data_async(EndPoint.TBHISTORY, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.TBHISTORY, **kwargs)
 
-    async def fetch_tw_async(self, enums: bool = False) -> Dict[Any, Any]:
+    async def fetch_tw_async(self, **kwargs) -> Dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event"""
-        return await self.fetch_data_async(EndPoint.TW, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.TW, **kwargs)
 
-    async def fetch_raid_async(self, enums: bool = False):
+    async def fetch_raid_async(self, **kwargs):
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event"""
-        return await self.fetch_data_async(EndPoint.RAID, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.RAID, **kwargs)
 
-    async def fetch_player_async(self, allycode: Optional[str] = None, enums: bool = False, ):
+    async def fetch_player_async(self, allycode: Optional[str] = None, **kwargs):
         """Return data from the PLAYER endpoint for the provided allycode"""
         validated_allycode = self._verify_allycode(allycode) if allycode else self.allycode
+        enums = kwargs.setdefault('enums', False)
         player = await self.fetch_data_async(
-            endpoint=EndPoint.PLAYER,
-            payload={"payload": {"allyCode": validated_allycode}},
-            enums=enums
-            )
+                endpoint=EndPoint.PLAYER,
+                payload={"payload": {"allyCode": validated_allycode}},
+                enums=enums
+                )
 
         if isinstance(player, dict) and 'events' in player:
             return player['events']
         else:
             return player
 
-    async def fetch_guild_async(self, guild_id: str, enums: bool = False, ):
+    async def fetch_guild_async(self, guild_id: str, **kwargs):
         """Return data from the GUILD endpoint for the provided guild"""
         validated_guild_id = self._verify_guild_id(guild_id)
+        enums = kwargs.setdefault('enums', False)
         guild = await self.fetch_data_async(
-            endpoint=EndPoint.GUILD,
+                endpoint=EndPoint.GUILD,
                 payload={"payload": {"guildId": validated_guild_id}},
-            enums=enums
-            )
+                enums=enums
+                )
 
         if isinstance(guild, dict) and 'events' in guild and 'guild' in guild['events']:
             return guild['events']['guild']
         else:
             return guild
 
-    async def fetch_squad_presets_async(self, enums: bool = False):
+    async def fetch_squad_presets_async(self, **kwargs):
         """Return data from the SQUADPRESETS endpoint"""
-        return await self.fetch_data_async(EndPoint.SQUADS, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.SQUADS, **kwargs)
 
-    async def fetch_gac_async(self, enums: bool = False):
+    async def fetch_gac_async(self, **kwargs):
         """Return data from the GAC endpoint"""
-        return await self.fetch_data_async(EndPoint.GAC, enums=enums)
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.GAC, **kwargs)
