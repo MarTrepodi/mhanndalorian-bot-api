@@ -1,5 +1,15 @@
 <!-- insertion marker -->
 
+## [v0.10.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.10.0) - 2026-01-30
+
+<small>[Compare with v0.9.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.9.0...v0.10.0)</small>
+
+### Features
+
+- add conquest support to API
+  methods ([ccd0979](https://github.com/MarTrepodi/mhanndalorian-bot-api/commit/ccd097944bec8d4c6234b9926b2ad05dbaed6137)
+  by MarTrepodi).
+
 ## [v0.9.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.9.0) - 2025-11-15
 
 <small>[Compare with v0.8.1](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.8.1...v0.9.0)</small>
