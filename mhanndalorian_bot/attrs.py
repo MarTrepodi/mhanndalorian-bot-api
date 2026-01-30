@@ -132,6 +132,7 @@ class EndPoint(Enum):
     PLAYER = "player"
     GUILD = "guild"
     SQUADS = "squadpresets"
+    CONQUEST = "conquest"
 
     # Player Registry endpoints
     FETCH = "database"

@@ -180,6 +180,11 @@ class API(MBot):
         kwargs.setdefault('enums', False)
         return self.fetch_data(EndPoint.GAC, **kwargs)
 
+    def fetch_conquest(self, **kwargs):
+        """Return data from the CONQUEST endpoint"""
+        kwargs.setdefault('enums', False)
+        return self.fetch_data(EndPoint.CONQUEST, **kwargs)
+
     # Async methods
     @func_timer
     async def fetch_data_async(
@@ -313,3 +318,8 @@ class API(MBot):
         """Return data from the GAC endpoint"""
         kwargs.setdefault('enums', False)
         return await self.fetch_data_async(EndPoint.GAC, **kwargs)
+
+    async def fetch_conquest_async(self, **kwargs):
+        """Return data from the CONQUEST endpoint"""
+        kwargs.setdefault('enums', False)
+        return await self.fetch_data_async(EndPoint.CONQUEST, **kwargs)
