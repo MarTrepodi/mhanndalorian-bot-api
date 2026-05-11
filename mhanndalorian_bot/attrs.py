@@ -1,4 +1,3 @@
-# coding=utf-8
 """
 Attribute definitions
 """
@@ -10,9 +9,7 @@ from typing import Any
 
 __all__ = ["APIKey", "AllyCode", "Debug", "HMAC", "Headers", "Payload", "EndPoint"]
 
-from mhanndalorian_bot.config import Config
-
-logger: logging.Logger = Config.logger
+logger = logging.getLogger(__name__)
 
 
 class ManagedAttribute(ABC):

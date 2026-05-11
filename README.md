@@ -38,6 +38,36 @@ mbot = Registry(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOU
 resp = mbot.fetch_player(allycode=<PLAYER ALLYCODE>)
 ```
 
+### Resource cleanup
+
+`API` and `Registry` hold open HTTP connections. For long-running services use the (async-)context
+manager so the underlying client is closed on exit:
+
+```python
+from mhanndalorian_bot import API
+
+with API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>) as mbot:
+    data = mbot.fetch_inventory()
+
+# async
+import asyncio
+from mhanndalorian_bot import API
+
+async def main():
+    async with API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>) as mbot:
+        data = await mbot.fetch_inventory_async()
+
+asyncio.run(main())
+```
+
+`close()` / `aclose()` are also available for explicit cleanup outside a `with` block.
+
+### TLS verification
+
+TLS certificate verification uses the system trust store by default. Pass a CA bundle path via
+`verify="/path/to/ca.pem"` for custom roots, or `verify=False` to disable verification (NOT
+recommended — exposes API keys and signed requests to MITM).
+
 ### Advanced Usage
 
 `mhanndalorian_bot` includes `async` methods in both the `API` and `Registry` modules. These are provided to facilitate

@@ -1,5 +1,73 @@
 <!-- insertion marker -->
 
+## [v0.11.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.11.0) - 2026-05-10
+
+<small>[Compare with v0.10.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.10.0...v0.11.0)</small>
+
+### ⚠ BREAKING CHANGES
+
+- **api**: `fetch_data_async` now writes the `enums` flag to `payload.payload.enums` to match
+  the synchronous `fetch_data`. Previously it was written to `payload.enums` and silently
+  ignored by the server. Callers that relied on this bug (i.e. expected `enums=True` to be
+  no-op in async) will see the flag take effect.
+
+### Security
+
+- Enable TLS certificate verification on the bundled `httpx.Client` and `httpx.AsyncClient`.
+  Previously both were constructed with `verify=False`, exposing API keys and signed
+  requests to MITM. A new constructor kwarg `verify: bool | str = True` is available for
+  callers that genuinely need a custom CA bundle (pass a path) or to opt back into the
+  insecure behaviour (`verify=False`, not recommended).
+- Redact API keys, allycodes, Discord IDs, and the `Authorization` / `api-key` /
+  `x-discord-id` headers from DEBUG logs. The `func_debug_logger` decorator now masks
+  sensitive argument names before formatting, and the post-sign header dump in
+  `MBot.sign()` masks credentials.
+- Restrict `GITHUB_TOKEN` permissions in the release workflow per CodeQL alert.
+
+### Bug Fixes
+
+- **api**: `fetch_data_async` now writes the `enums` flag to the correct nested path
+  (`payload.payload.enums`), matching the sync method.
+- **api**: `fetch_data` and `fetch_data_async` no longer mutate caller-supplied payload
+  dictionaries — the payload is deep-copied before the `enums` flag is set.
+- **registry**: `Registry.__init__` now forwards `discord_id` to the parent constructor
+  directly instead of passing the `None` return value of `set_discord_id()`.
+- **ci**: Release workflow installs dependencies via `uv sync --frozen` (the missing
+  `requirements.txt` was a leftover from the uv migration), corrects the
+  `python3 install git-changelog` typo to use `uv tool run`, and uploads the built
+  distributions so the `pypi-publish` job has artifacts to download.
+
+### Features
+
+- Add `MBot.close()` / `MBot.aclose()` and (async-)context-manager support
+  (`with API(...) as api:` / `async with API(...) as api:`) for explicit HTTP-client
+  lifecycle management.
+- Add `verify` constructor kwarg and `MBot.set_verify()` method for TLS configuration.
+
+### Changed
+
+- HMAC signature tracing now short-circuits when DEBUG logging is disabled, avoiding
+  repeated `hmac_obj.hexdigest()` state copies in hot paths.
+- Type hints modernized to PEP 604 syntax (`str | None` instead of `Optional[str]`,
+  `dict[str, Any]` instead of `Dict[str, Any]`); requires Python ≥ 3.10 which the
+  package already declared.
+- `calc_tw_score_total` accepts any iterable of zone-status dicts and uses a generator
+  expression instead of a temporary list inside `sum()`.
+- Logging follows Python library best practices: a `NullHandler` is attached to the
+  `mhanndalorian_bot` root logger in `__init__.py` so importing the package never
+  emits "no handler" warnings; consumers configure handlers / levels on their own
+  application loggers. Each module obtains its logger via `logging.getLogger(__name__)`.
+- Removed the unused `mhanndalorian_bot.config.Config` class and its sole reference
+  from `mhanndalorian_bot.attrs`.
+
+### Documentation
+
+- `README.md` and `Library_Details.md` document the new `verify` kwarg, the
+  context-manager / `close()` / `aclose()` lifecycle helpers, and the redaction
+  applied to DEBUG output.
+- `examples/Registry/register_player.py` now passes the required `discord_id` to
+  `Registry(...)`; previously the example would `TypeError` if run as-is.
+
 ## [v0.10.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.10.0) - 2026-01-30
 
 <small>[Compare with v0.9.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.9.0...v0.10.0)</small>

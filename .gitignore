@@ -1,3 +1,11 @@
 /dump.rdb
 *.json
 /dist/
+__pycache__/
+
+# Secrets — never commit any of these
+.env
+.env.*
+*.pem
+*.key
+secrets/

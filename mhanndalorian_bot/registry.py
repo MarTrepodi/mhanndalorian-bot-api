@@ -1,11 +1,10 @@
-# coding=utf-8
 """
 Class definition for SWGOH MHanndalorian Bot player registry service
 """
-from __future__ import absolute_import, annotations
+from __future__ import annotations
 
 import logging
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     import httpx
@@ -22,10 +21,11 @@ class Registry(MBot):
 
     logger = logging.getLogger(__name__)
 
-    def __init__(self, api_key: str, allycode: str, discord_id: str, *, api_host: str = "https://mhanndalorianbot.work",
-                 hmac: bool = True, debug: bool = False):
-        super().__init__(api_key=api_key, allycode=allycode, discord_id=self.set_discord_id(discord_id),
-                         api_host=api_host, hmac=hmac, debug=debug)
+    def __init__(self, api_key: str, allycode: str, discord_id: str, *,
+                 api_host: str = "https://mhanndalorianbot.work", hmac: bool = True, debug: bool = False,
+                 verify: bool | str = True):
+        super().__init__(api_key=api_key, allycode=allycode, discord_id=discord_id,
+                         api_host=api_host, hmac=hmac, debug=debug, verify=verify)
 
     @func_timer
     def validate_arguments(self, allycode: str, discord_id: str) -> str:
@@ -47,7 +47,7 @@ class Registry(MBot):
             allycode: str | None = None,
             discord_id: str | None = None,
             hmac: bool = False
-            ) -> Dict[Any, Any]:
+            ) -> dict[Any, Any]:
         """Return player data from the provided allycode
 
             Keyword Args
@@ -66,21 +66,19 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: httpx.Response = self.client.post(endpoint, json=payload)
+        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_data = resp.json()
             if isinstance(resp_data, list) and len(resp_data) == 1:
                 return resp_data[0]
-            else:
-                return resp_data
-        else:
-            raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+            return resp_data
+        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
 
     @func_timer
     def register_player(self,
                         discord_id: str,
-                        allycode: str, *, hmac: bool = False) -> Dict[str, Any]:
+                        allycode: str, *, hmac: bool = False) -> dict[str, Any]:
         """Register a player in the registry
 
             Args
@@ -103,12 +101,11 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: httpx.Response = self.client.post(endpoint, json=payload)
+        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
-        else:
-            raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
 
     @func_timer
     def verify_player(self, discord_id: str, allycode: str, *, primary: bool = False, hmac: bool = False) -> bool:
@@ -136,7 +133,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: httpx.Response = self.client.post(endpoint, json=payload)
+        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
@@ -154,7 +151,7 @@ class Registry(MBot):
             allycode: str | None = None,
             discord_id: str | None = None,
             hmac: bool = False
-            ) -> Dict[Any, Any]:
+            ) -> dict[Any, Any]:
         """Return player data from the provided allycode
 
             Keyword Args
@@ -173,19 +170,17 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        result: httpx.Response = await self.aclient.post(endpoint, json=payload)
+        result: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
 
         if result.status_code == 200:
             resp_data = result.json()
             if isinstance(resp_data, list) and len(resp_data) == 1:
                 return resp_data[0]
-            else:
-                return resp_data
-        else:
-            return {"msg": "Unexpected result", "reason": result.content.decode()}
+            return resp_data
+        return {"msg": "Unexpected result", "reason": result.content.decode()}
 
     @func_timer
-    async def register_player_async(self, discord_id: str, allycode: str, *, hmac: bool = False) -> Dict[Any, Any]:
+    async def register_player_async(self, discord_id: str, allycode: str, *, hmac: bool = False) -> dict[Any, Any]:
         """Register a player in the registry
 
             Args
@@ -208,12 +203,11 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
+        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
-        else:
-            raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
 
     @func_timer
     async def verify_player_async(self,
@@ -244,7 +238,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
+        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
