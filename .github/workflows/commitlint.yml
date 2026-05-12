@@ -1,0 +1,46 @@
+name: Commit Lint
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    name: Validate Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install commitlint
+        run: npm install -g @commitlint/{cli,config-conventional}
+
+      - name: Create commitlint config
+        run: |
+          cat > .commitlintrc.json << 'EOF'
+          {
+            "extends": ["@commitlint/config-conventional"],
+            "rules": {
+              "type-enum": [2, "always", [
+                "feat", "fix", "refactor", "build", "deps", "bug",
+                "chore", "docs", "test", "style", "ci", "perf"
+              ]],
+              "scope-enum": [1, "always", [
+                "api", "registry", "attrs", "utils", "core",
+                "deps", "release", "ci", "version", "docs",
+                "tests", "examples"
+              ]],
+              "subject-max-length": [1, "always", 100],
+              "header-max-length": [0, "always"],
+              "body-max-line-length": [0, "always"],
+              "footer-max-line-length": [0, "always"]
+            }
+          }
+          EOF
+
+      - name: Validate commits
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
