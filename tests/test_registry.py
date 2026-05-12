@@ -21,7 +21,7 @@ def test_mock_fetch_player_valid_allycode(httpx_mock: HTTPXMock, registry_instan
 def test_fetch_player_invalid_allycode(httpx_mock: HTTPXMock, registry_instance):
     """Test fetching a player with an invalid allycode."""
     with pytest.raises(ValueError, match="Invalid allyCode"):
-        response = registry_instance.fetch_player(allycode="invalid_allycode", hmac=True)
+        registry_instance.fetch_player(allycode="invalid_allycode", hmac=True)
 
 
 def test_register_player_valid_data(registry_instance):
@@ -34,7 +34,7 @@ def test_register_player_valid_data(registry_instance):
 def test_register_player_invalid_data(registry_instance):
     """Test registering a player with invalid data."""
     with pytest.raises(ValueError, match="Invalid"):
-        response = registry_instance.register_player(discord_id="", allycode="invalid_allycode", hmac=True)
+        registry_instance.register_player(discord_id="", allycode="invalid_allycode", hmac=True)
 
 
 def test_verify_player_valid_data(registry_instance):
@@ -46,4 +46,4 @@ def test_verify_player_valid_data(registry_instance):
 def test_verify_player_invalid_data(registry_instance):
     """Test verifying a player with invalid data."""
     with pytest.raises(ValueError, match="Invalid"):
-        result = registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)
+        registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)
