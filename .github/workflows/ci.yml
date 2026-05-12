@@ -42,8 +42,6 @@ jobs:
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
-    # Allowed to fail until the codebase is fully typed.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
@@ -59,7 +57,9 @@ jobs:
         run: uv sync
 
       - name: Run ty
-        run: uvx ty check mhanndalorian_bot/
+        # Allowed to fail until the codebase is fully typed. Remove `|| true`
+        # once existing type errors are resolved.
+        run: uvx ty check mhanndalorian_bot/ || true
 
   # ── Test ───────────────────────────────────────────────────────────────
   test:
