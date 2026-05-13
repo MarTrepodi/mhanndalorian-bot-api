@@ -39,7 +39,12 @@ def test_register_player_invalid_data(registry_instance):
 
 def test_verify_player_valid_data(registry_instance):
     """Test verifying a player with valid discord ID and allycode."""
-    result = registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789", primary=False, hmac=True)
+    result = registry_instance.verify_player(
+        discord_id="123456789987654321",
+        allycode="123-456-789",
+        primary=False,
+        hmac=True,
+    )
     assert isinstance(result, bool)
 
 
