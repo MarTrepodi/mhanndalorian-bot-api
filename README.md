@@ -130,4 +130,4 @@ if __name__ == '__main__':
 ```
 
 More information can be found
-on [GitHub](https://github.com/MarTrepodi/mhanndalorian-bot-api/tree/main/Library_Details.md)
+on [GitHub](https://github.com/MarTrepodi/mhanndalorian-bot-api/blob/main/Library_Details.md)
