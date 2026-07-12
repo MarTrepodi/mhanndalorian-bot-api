@@ -34,8 +34,6 @@ jobs:
         run: uvx ruff check mhanndalorian_bot/ tests/
 
       - name: Run Ruff formatter check
-        # NOTE: Set continue-on-error to false once the initial formatting PR is merged
-        continue-on-error: true
         run: uvx ruff format --check mhanndalorian_bot/ tests/
 
   # ── Type check (ty / Astral) ──────────────────────────────────────────
@@ -82,15 +80,13 @@ jobs:
         run: uv sync
 
       - name: Run tests with coverage
-        # Allowed to fail until pre-existing test failures (live-API call in
-        # test_register_player_valid_data) are fixed in a follow-up PR.
-        # Remove `|| true` once tests/ is green.
         run: |
           uv run python -m pytest tests/ \
             --cov=mhanndalorian_bot \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
-            -v || true
+            --cov-fail-under=80 \
+            -v
 
       - name: Upload coverage artifact
         if: matrix.python-version == '3.12'
