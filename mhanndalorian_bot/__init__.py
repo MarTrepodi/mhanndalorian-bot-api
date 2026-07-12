@@ -4,6 +4,8 @@ Public API:
     API       - authenticated endpoint client
     Registry  - player registry client
     EndPoint  - endpoint enum
+    Exceptions - MBotError (base, subclasses RuntimeError), APIResponseError,
+                 BadRequestError (400), AuthenticationError (401), AuthorizationError (403)
 
 Logging:
     This package emits records under the ``mhanndalorian_bot`` logger hierarchy and attaches a
@@ -17,9 +19,26 @@ Logging:
 import logging
 
 from .api import API
-from .attrs import EndPoint
+from .attrs import EndPoint, LeaderboardType
+from .exceptions import (
+    APIResponseError,
+    AuthenticationError,
+    AuthorizationError,
+    BadRequestError,
+    MBotError,
+)
 from .registry import Registry
 
-__all__ = ["API", "EndPoint", "Registry"]
+__all__ = [
+    "API",
+    "APIResponseError",
+    "AuthenticationError",
+    "AuthorizationError",
+    "BadRequestError",
+    "EndPoint",
+    "LeaderboardType",
+    "MBotError",
+    "Registry",
+]
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())

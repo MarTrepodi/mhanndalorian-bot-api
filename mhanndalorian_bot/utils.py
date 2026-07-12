@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable
 from functools import wraps
-from typing import Any, Iterable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ def _format_redacted_call(func, args: tuple, kwargs: dict[str, Any]) -> str:
     """Build a function-call string with sensitive arg values redacted."""
     try:
         import inspect
+
         sig = inspect.signature(func)
         bound = sig.bind_partial(*args, **kwargs)
         parts: list[str] = []
@@ -93,7 +95,7 @@ def calc_tw_score_total(zone_status_list: Iterable[dict[str, Any]]) -> int:
     if not isinstance(zone_status_list, list):
         raise TypeError("'zone_status' must be a list")
 
-    return sum(int(item['zoneStatus']['score']) for item in zone_status_list)
+    return sum(int(item["zoneStatus"]["score"]) for item in zone_status_list)
 
 
 def get_tw_opponent_url(tw_data: dict[str, Any]) -> str:
@@ -119,7 +121,7 @@ def get_tw_opponent_url(tw_data: dict[str, Any]) -> str:
     if not isinstance(tw_data, dict):
         raise TypeError("'tw_data' must be a dictionary")
 
-    guild_id = tw_data.get('awayGuild', {}).get('profile', {}).get('id')
+    guild_id = tw_data.get("awayGuild", {}).get("profile", {}).get("id")
 
     if not guild_id:
         raise ValueError("'tw_data' does not contain 'awayGuild' profile information.")

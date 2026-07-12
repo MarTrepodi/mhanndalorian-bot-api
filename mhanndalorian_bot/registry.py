@@ -1,16 +1,18 @@
 """
 Class definition for SWGOH MHanndalorian Bot player registry service
 """
+
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import httpx
 
-from mhanndalorian_bot.base import MBot
 from mhanndalorian_bot.attrs import EndPoint
+from mhanndalorian_bot.base import MBot
+from mhanndalorian_bot.exceptions import raise_for_response
 from mhanndalorian_bot.utils import func_timer
 
 
@@ -21,11 +23,30 @@ class Registry(MBot):
 
     logger = logging.getLogger(__name__)
 
-    def __init__(self, api_key: str, allycode: str, discord_id: str, *,
-                 api_host: str = "https://mhanndalorianbot.work", hmac: bool = True, debug: bool = False,
-                 verify: bool | str = True):
-        super().__init__(api_key=api_key, allycode=allycode, discord_id=discord_id,
-                         api_host=api_host, hmac=hmac, debug=debug, verify=verify)
+    def __init__(
+        self,
+        api_key: str | None = None,
+        allycode: str | None = None,
+        discord_id: str | None = None,
+        *,
+        api_host: str = "https://mhanndalorianbot.work",
+        hmac: bool = True,
+        debug: bool = False,
+        verify: bool | str = True,
+        timeout: float = 75.0,
+        retries: int = 0,
+    ):
+        super().__init__(
+            api_key=api_key,
+            allycode=allycode,
+            discord_id=discord_id,
+            api_host=api_host,
+            hmac=hmac,
+            debug=debug,
+            verify=verify,
+            timeout=timeout,
+            retries=retries,
+        )
 
     @func_timer
     def validate_arguments(self, allycode: str | None, discord_id: str | None) -> str:
@@ -45,53 +66,50 @@ class Registry(MBot):
 
     @func_timer
     def fetch_player(
-            self, *,
-            allycode: str | None = None,
-            discord_id: str | None = None,
-            hmac: bool = False
-            ) -> dict[Any, Any]:
+        self, *, allycode: str | None = None, discord_id: str | None = None, hmac: bool = False
+    ) -> dict[Any, Any]:
         """Return player data from the provided allycode
 
-            Keyword Args
-                allycode: Player allycode as a string.
-                discord_id: Discord user ID as a string.
-                hmac: Boolean flag to indicate use of HMAC request signing.
+        Keyword Args
+            allycode: Player allycode as a string.
+            discord_id: Discord user ID as a string.
+            hmac: Boolean flag to indicate use of HMAC request signing.
 
-            Returns
-                Dictionary from JSON response, if found. Else None.
+        Returns
+            Dictionary from JSON response, if found. Else None.
         """
 
         user_identifier = self.validate_arguments(allycode, discord_id)
-        payload = {'user': [user_identifier], 'endpoint': 'find'}
+        payload = {"user": [user_identifier], "endpoint": "find"}
         endpoint = f"/api/{EndPoint.FETCH.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_data = resp.json()
             if isinstance(resp_data, list) and len(resp_data) == 1:
                 return resp_data[0]
             return resp_data
-        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+        raise_for_response(resp, endpoint)
 
     @func_timer
-    def register_player(self,
-                        discord_id: str,
-                        allycode: str, *, hmac: bool = False) -> dict[str, Any]:
+    def register_player(self, discord_id: str, allycode: str, *, hmac: bool = False) -> dict[str, Any]:
         """Register a player in the registry
 
-            Args
-                discord_id: Discord user ID as a string
-                allycode: Player allycode as a string
+        Args
+            discord_id: Discord user ID as a string
+            allycode: Player allycode as a string
 
-            Keyword Args
-                hmac: Boolean flag to indicate use of HMAC request signing.
+        Keyword Args
+            hmac: Boolean flag to indicate use of HMAC request signing.
 
-            Returns
-                Dict containing `unlockedPlayerPortrait` and `unlockedPlayerTitle` keys, if successful
+        Returns
+            Dict containing `unlockedPlayerPortrait` and `unlockedPlayerTitle` keys, if successful
         """
 
         allycode = self.cleanse_allycode(allycode)
@@ -101,29 +119,34 @@ class Registry(MBot):
         endpoint = f"/api/{EndPoint.REGISTER.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
-        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+        raise_for_response(resp, endpoint)
 
     @func_timer
     def verify_player(self, discord_id: str, allycode: str, *, primary: bool = False, hmac: bool = False) -> bool:
         """Perform player portrait and title verification after register_player() has been called.
 
-            Args
-                discord_id: Discord user ID as a string.
-                allycode: Player allycode as a string.
+        Args
+            discord_id: Discord user ID as a string.
+            allycode: Player allycode as a string.
 
-            Keyword Args
-                primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
-                            in cases where multiple allycodes are registered to the same discord ID.
-                hmac: Boolean flag to indicate use of HMAC request signing.
+        Keyword Args
+            primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
+                        in cases where multiple allycodes are registered to the same discord ID.
+            hmac: Boolean flag to indicate use of HMAC request signing.
 
-            Returns
-                True if successful, False otherwise
+        Returns
+            True if the player is verified, False otherwise
+
+        Raises
+            APIResponseError: if the HTTP request itself fails (non-200 response)
         """
 
         allycode = self.cleanse_allycode(allycode)
@@ -133,67 +156,64 @@ class Registry(MBot):
         endpoint = f"/api/{EndPoint.VERIFY.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
-            if 'verified' in resp_json:
-                return resp_json['verified']
-        else:
-            self.logger.error(f"Unexpected result: {resp.content.decode()}")
-
-        return False
+            return bool(resp_json.get("verified", False))
+        raise_for_response(resp, endpoint)
 
     # Async methods
     @func_timer
     async def fetch_player_async(
-            self, *,
-            allycode: str | None = None,
-            discord_id: str | None = None,
-            hmac: bool = False
-            ) -> dict[Any, Any]:
+        self, *, allycode: str | None = None, discord_id: str | None = None, hmac: bool = False
+    ) -> dict[Any, Any]:
         """Return player data from the provided allycode
 
-            Keyword Args
-                allycode: Player allycode as a string.
-                discord_id: Discord user ID as a string.
-                hmac: Boolean flag to indicate use of HMAC request signing.
+        Keyword Args
+            allycode: Player allycode as a string.
+            discord_id: Discord user ID as a string.
+            hmac: Boolean flag to indicate use of HMAC request signing.
 
-            Returns
-                Dictionary from JSON response, if found. Else None.
+        Returns
+            Dictionary from JSON response, if found. Else None.
         """
 
         user_identifier = self.validate_arguments(allycode, discord_id)
-        payload = {'user': [user_identifier], 'endpoint': 'find'}
+        payload = {"user": [user_identifier], "endpoint": "find"}
         endpoint = f"/api/{EndPoint.FETCH.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        result: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        result: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if result.status_code == 200:
             resp_data = result.json()
             if isinstance(resp_data, list) and len(resp_data) == 1:
                 return resp_data[0]
             return resp_data
-        return {"msg": "Unexpected result", "reason": result.content.decode()}
+        raise_for_response(result, endpoint)
 
     @func_timer
     async def register_player_async(self, discord_id: str, allycode: str, *, hmac: bool = False) -> dict[Any, Any]:
         """Register a player in the registry
 
-            Args
-                discord_id: Discord user ID as a string.
-                allycode: Player allycode as a string.
+        Args
+            discord_id: Discord user ID as a string.
+            allycode: Player allycode as a string.
 
-            Keyword Args
-                hmac: Boolean flag to indicate use of HMAC request signing.
+        Keyword Args
+            hmac: Boolean flag to indicate use of HMAC request signing.
 
-            Returns
-                Dict containing `unlockedPlayerPortrait` and `unlockedPlayerTitle` keys, if successful.
+        Returns
+            Dict containing `unlockedPlayerPortrait` and `unlockedPlayerTitle` keys, if successful.
         """
 
         allycode = self.cleanse_allycode(allycode)
@@ -203,32 +223,36 @@ class Registry(MBot):
         endpoint = f"/api/{EndPoint.REGISTER.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
-        raise RuntimeError(f"Unexpected result: {resp.content.decode()}")
+        raise_for_response(resp, endpoint)
 
     @func_timer
-    async def verify_player_async(self,
-                                  discord_id: str,
-                                  allycode: str, *,
-                                  primary: bool = False, hmac: bool = False) -> bool:
+    async def verify_player_async(
+        self, discord_id: str, allycode: str, *, primary: bool = False, hmac: bool = False
+    ) -> bool:
         """Perform player portrait and title verification
 
-            Args
-                discord_id: Discord user ID as a string
-                allycode: Player allycode as a string
+        Args
+            discord_id: Discord user ID as a string
+            allycode: Player allycode as a string
 
-            Keyword Args
-                primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
-                            in cases where multiple allycodes are registered to the same discord ID
-                hmac: Boolean flag to indicate use of HMAC request signing. Default: False.
+        Keyword Args
+            primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
+                        in cases where multiple allycodes are registered to the same discord ID
+            hmac: Boolean flag to indicate use of HMAC request signing. Default: False.
 
-            Returns
-                True if successful, False otherwise
+        Returns
+            True if the player is verified, False otherwise
+
+        Raises
+            APIResponseError: if the HTTP request itself fails (non-200 response)
         """
 
         allycode = self.cleanse_allycode(allycode)
@@ -238,15 +262,13 @@ class Registry(MBot):
         endpoint = f"/api/{EndPoint.VERIFY.value}"
 
         if hmac or self.hmac is True:
-            self.sign(method='POST', endpoint=endpoint, payload=payload)
+            self.sign(method="POST", endpoint=endpoint, payload=payload)
+        else:
+            self._ensure_api_key_header()
 
-        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
-            if 'verified' in resp_json:
-                return resp_json['verified']
-        else:
-            self.logger.error(f"Unexpected result: {resp.content.decode()}")
-
-        return False
+            return bool(resp_json.get("verified", False))
+        raise_for_response(resp, endpoint)
