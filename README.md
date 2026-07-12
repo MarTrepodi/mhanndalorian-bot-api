@@ -38,6 +38,72 @@ mbot = Registry(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOU
 resp = mbot.fetch_player(allycode=<PLAYER ALLYCODE>)
 ```
 
+### Credentials from environment variables
+
+Constructor arguments may be omitted when the `MHANN_API_KEY`, `MHANN_ALLYCODE`, and
+(optionally) `MHANN_DISCORD_ID` environment variables are set:
+
+```python
+from mhanndalorian_bot import API
+
+mbot = API()  # reads MHANN_API_KEY and MHANN_ALLYCODE
+```
+
+### Authenticated vs non-authenticated endpoints
+
+The API distinguishes two endpoint groups. **Authenticated** endpoints log in as the registered
+player and may interrupt an active in-game session: `tw`, `twlogs`, `twleaderboard`, `tb`,
+`tblogs`, `tbleaderboardhistory`, `activeraid`, `gac`, `inventory`, `leaderboard`,
+`squadpresets`, `conquest`, and `events`. **Non-authenticated** endpoints (`player`,
+`playerarena`, `guild`, `guildleaderboard`, `database`) do not touch the game session.
+Programmatically, check `EndPoint.TW.is_authenticated`.
+
+### Error handling
+
+Non-200 responses raise typed exceptions carrying `status_code`, `endpoint`, and
+`response_text` attributes. All subclass `MBotError`, which subclasses `RuntimeError`:
+
+```python
+from mhanndalorian_bot import API, AuthenticationError, MBotError
+
+mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
+
+try:
+    data = mbot.fetch_inventory()
+except AuthenticationError:      # HTTP 401 - bad API key or HMAC signature
+    ...
+except MBotError as exc:         # any other API error (400, 403, 5xx, ...)
+    print(exc.status_code, exc.endpoint)
+```
+
+### Guild leaderboards and player arena
+
+```python
+from mhanndalorian_bot import API, LeaderboardType
+
+mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
+
+top_gp = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_GALACTIC_POWER, count=100)
+raid = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_RAID_HIGH_WATERMARK,
+                                    def_id="GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF01")
+
+# playerarena is also a lightweight allycode <-> playerId translation
+profile = mbot.fetch_player_arena(player_id=<PLAYER ID>)
+```
+
+`fetch_player` and `fetch_player_arena` accept either `allycode` or `player_id` (mutually
+exclusive). Applications approved to act on behalf of other users can pass
+`user_discord_id=<DISCORD ID>` to any fetch helper; this forces HMAC signing as the API requires.
+
+### Timeouts and retries
+
+```python
+mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, timeout=30.0, retries=2)
+```
+
+`timeout` (seconds, default 75) applies to every request; `retries` (default 0) retries failed
+*connection attempts* only — failed responses are never retried.
+
 ### Resource cleanup
 
 `API` and `Registry` hold open HTTP connections. For long-running services use the (async-)context
@@ -82,24 +148,22 @@ will be bots.
 
 ```python
 import asyncio
-from mhanndalorian_bot import API, EndPoint
+from mhanndalorian_bot import API, EndPoint, MBotError
 
 async def main():
     mbot = API(api_key="super_secret_test_key", allycode="123456789")
-    
-    fetch_data_resp = await mbot.fetch_data_async(EndPoint.INVENTORY)
 
-    if isinstance(fetch_data_resp, dict):
-        if 'msg' in fetch_data_resp:
-            # An unexpected error occurred
-            print(f"An unexpected error occurred: {fetch_data_resp}")
-        elif 'inventory' in fetch_data_resp:
-            material: list = fetch_data_resp['inventory']['material']
-            currency: list = fetch_data_resp['inventory']['currencyItem']
-            equipment: list = fetch_data_resp['inventory']['equipment']
-            unequipped_mods: list = fetch_data_resp['inventory']['unequippedMod']
-        else:
-            raise RuntimeError("Not sure what happened.")
+    try:
+        fetch_data_resp = await mbot.fetch_data_async(EndPoint.INVENTORY)
+    except MBotError as exc:
+        print(f"API error {exc.status_code} from {exc.endpoint}: {exc.response_text}")
+        return
+
+    if 'inventory' in fetch_data_resp:
+        material: list = fetch_data_resp['inventory']['material']
+        currency: list = fetch_data_resp['inventory']['currencyItem']
+        equipment: list = fetch_data_resp['inventory']['equipment']
+        unequipped_mods: list = fetch_data_resp['inventory']['unequippedMod']
 
 if __name__ == '__main__':
     asyncio.run(main())
@@ -109,21 +173,19 @@ if __name__ == '__main__':
 
 ```python
 import asyncio
-from mhanndalorian_bot import Registry
+from mhanndalorian_bot import MBotError, Registry
 
 async def main():
     reg = Registry(api_key=<YOUR API KEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOUR DISCORD USER ID>)
 
-    # Returns 'None' if player does not exist in the registry
-    fetch_resp = await reg.fetch_player_async(allycode)
+    try:
+        fetch_resp = await reg.fetch_player_async(allycode=<PLAYER ALLYCODE>)
+    except MBotError as exc:
+        print(f"Registry error {exc.status_code}: {exc.response_text}")
+        return
 
-    if isinstance(fetch_resp, dict):
-        if 'msg' in fetch_resp:
-            # An unexpected error occurred
-            print(f"An unexpected error occurred: {fetch_resp}")
-        else:
-            player_allycode = fetch_resp['allyCode']
-            player_discord_id = fetch_resp['discordId']
+    player_allycode = fetch_resp['allyCode']
+    player_discord_id = fetch_resp['discordId']
 
 if __name__ == '__main__':
     asyncio.run(main())

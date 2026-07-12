@@ -1,6 +1,6 @@
 <!-- insertion marker -->
 
-## [v0.11.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.11.0) - 2026-05-10
+## [v0.11.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.11.0) - 2026-07-12
 
 <small>[Compare with v0.10.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.10.0...v0.11.0)</small>
 
@@ -10,6 +10,17 @@
   the synchronous `fetch_data`. Previously it was written to `payload.enums` and silently
   ignored by the server. Callers that relied on this bug (i.e. expected `enums=True` to be
   no-op in async) will see the flag take effect.
+- **base**: HTTP clients, headers, and payload state are now **per-instance** instead of
+  class-level. Multiple `API`/`Registry` instances in one process no longer clobber each
+  other's credentials. Code referencing `MBot.client` at class level must use an instance.
+- **registry**: `Registry.fetch_player_async` now raises on non-200 responses (matching the
+  sync method) instead of returning an error dict (`{"msg": ..., "reason": ...}`).
+- **registry**: `Registry.verify_player` / `verify_player_async` now raise `APIResponseError`
+  on non-200 responses instead of logging and returning `False`. A `False` return now
+  strictly means "the player is not verified".
+- **errors**: non-200 responses raise typed exceptions (`BadRequestError` 400,
+  `AuthenticationError` 401, `AuthorizationError` 403, `APIResponseError` otherwise). All
+  subclass `MBotError(RuntimeError)`, so existing `except RuntimeError` handlers keep working.
 
 ### Security
 
@@ -23,6 +34,9 @@
   sensitive argument names before formatting, and the post-sign header dump in
   `MBot.sign()` masks credentials.
 - Restrict `GITHUB_TOKEN` permissions in the release workflow per CodeQL alert.
+- `MBot.sign()` no longer logs intermediate or final HMAC hexdigests (the final digest *is*
+  the `Authorization` header value) nor the raw payload string at DEBUG level. Only the
+  non-reversible payload MD5 digest and the redacted final header set are logged.
 
 ### Bug Fixes
 
@@ -36,6 +50,10 @@
   `requirements.txt` was a leftover from the uv migration), corrects the
   `python3 install git-changelog` typo to use `uv tool run`, and uploads the built
   distributions so the `pypi-publish` job has artifacts to download.
+- **api**: `fetch_tb` / `fetch_tb_async` now default `enums=False` like every other helper.
+- **api**: an unsigned (`hmac=False`) request issued after a signed one restores the
+  plaintext `api-key` header and drops the stale `Authorization` / `x-timestamp` headers;
+  previously the credential header was permanently lost after the first signed call.
 
 ### Features
 
@@ -43,6 +61,27 @@
   (`with API(...) as api:` / `async with API(...) as api:`) for explicit HTTP-client
   lifecycle management.
 - Add `verify` constructor kwarg and `MBot.set_verify()` method for TLS configuration.
+- **api**: new endpoint helpers for full parity with API spec v1.0.1 (all with async twins):
+  `fetch_guild_leaderboard` (`/api/guildleaderboard`, with `LeaderboardType` enum, `count`
+  1-200 validation, and optional `def_id`), `fetch_player_arena` (`/api/playerarena`), and
+  `fetch_events` (`/api/events`).
+- **api**: `fetch_player` / `fetch_player_arena` accept `player_id` as a mutually-exclusive
+  alternative to `allycode`, matching the live API contract.
+- **api**: `fetch_data` / `fetch_data_async` accept `user_discord_id` for applications
+  approved to act on behalf of other users; sets `payload.userDiscordId` and forces HMAC
+  signing as the API requires. Available from every named helper via `**kwargs`.
+- **base**: credentials fall back to the `MHANN_API_KEY`, `MHANN_ALLYCODE`, and
+  `MHANN_DISCORD_ID` environment variables when constructor arguments are omitted.
+- **base**: new constructor kwargs `timeout` (default 75.0 seconds) and `retries`
+  (connection-level retries via httpx transports, default 0).
+- **attrs**: new `LeaderboardType` IntEnum, `EndPoint.GUILDLEADERBOARD` / `EndPoint.PLAYERARENA`
+  members, `AUTHENTICATED_ENDPOINTS` frozenset, and `EndPoint.is_authenticated` property.
+  Docstrings on all session-breaking helpers now carry an explicit warning.
+- **errors**: new public exception hierarchy exported from the package root: `MBotError`,
+  `APIResponseError` (with `status_code`, `endpoint`, `response_text` attributes),
+  `BadRequestError`, `AuthenticationError`, `AuthorizationError`.
+- **packaging**: ship a `py.typed` marker (PEP 561) and the `Typing :: Typed` classifier so
+  type checkers consume the library's inline annotations.
 
 ### Changed
 
@@ -59,6 +98,12 @@
   application loggers. Each module obtains its logger via `logging.getLogger(__name__)`.
 - Removed the unused `mhanndalorian_bot.config.Config` class and its sole reference
   from `mhanndalorian_bot.attrs`.
+- Removed the dead `mhanndalorian_bot.attrs.DiscordId` descriptor (never used or exported).
+- Ruff lint rules broadened to `E, F, I, UP, B` and the whole codebase formatted with
+  `ruff format`; both are now enforced in CI (no `continue-on-error`).
+- CI test job no longer tolerates failures (`|| true` removed) — the registry tests that
+  previously hit the live API are now mocked with `pytest-httpx` — and enforces a
+  coverage floor of 80% (currently ~87%).
 
 ### Documentation
 
