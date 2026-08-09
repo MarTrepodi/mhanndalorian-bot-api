@@ -1,6 +1,9 @@
+import json
+
 import pytest
 from pytest_httpx import HTTPXMock
 
+from mhanndalorian_bot.exceptions import ValidationError
 from mhanndalorian_bot.registry import Registry
 
 
@@ -20,30 +23,62 @@ def test_mock_fetch_player_valid_allycode(httpx_mock: HTTPXMock, registry_instan
 
 def test_fetch_player_invalid_allycode(httpx_mock: HTTPXMock, registry_instance):
     """Test fetching a player with an invalid allycode."""
-    with pytest.raises(ValueError, match="Invalid allyCode"):
+    with pytest.raises(ValidationError, match="Invalid allyCode"):
         registry_instance.fetch_player(allycode="invalid_allycode", hmac=True)
 
 
-def test_register_player_valid_data(registry_instance):
+def test_register_player_valid_data(httpx_mock: HTTPXMock, registry_instance):
     """Test registering a player with valid discord ID and allycode."""
+    httpx_mock.add_response(
+        json={"unlockedPlayerPortrait": "portrait", "unlockedPlayerTitle": "title"}, status_code=200
+    )
     response = registry_instance.register_player(discord_id="123456789987654321", allycode="123-456-789", hmac=True)
-    assert response is not None
-    assert isinstance(response, dict)
+    assert response == {"unlockedPlayerPortrait": "portrait", "unlockedPlayerTitle": "title"}
+
+    request = httpx_mock.get_requests()[0]
+    assert request.url.path == "/api/comlink"
+    sent = json.loads(request.content)
+    assert sent == {"discordId": "123456789987654321", "method": "registration", "payload": {"allyCode": "123456789"}}
+    assert "authorization" in request.headers
+    assert "x-timestamp" in request.headers
 
 
 def test_register_player_invalid_data(registry_instance):
     """Test registering a player with invalid data."""
-    with pytest.raises(ValueError, match="Invalid"):
+    with pytest.raises(ValidationError, match="Invalid"):
         registry_instance.register_player(discord_id="", allycode="invalid_allycode", hmac=True)
 
 
-def test_verify_player_valid_data(registry_instance):
+def test_verify_player_valid_data(httpx_mock: HTTPXMock, registry_instance):
     """Test verifying a player with valid discord ID and allycode."""
-    result = registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789", primary=False, hmac=True)
-    assert isinstance(result, bool)
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    result = registry_instance.verify_player(
+        discord_id="123456789987654321",
+        allycode="123-456-789",
+        primary=False,
+        hmac=True,
+    )
+    assert result is True
+
+    request = httpx_mock.get_requests()[0]
+    assert request.url.path == "/api/comlink"
+    sent = json.loads(request.content)
+    assert sent == {
+        "discordId": "123456789987654321",
+        "method": "verification",
+        "primary": False,
+        "payload": {"allyCode": "123456789"},
+    }
+
+
+def test_verify_player_not_verified(httpx_mock: HTTPXMock, registry_instance):
+    """A 200 response without verified=True means the player is not verified."""
+    httpx_mock.add_response(json={"verified": False}, status_code=200)
+    result = registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789")
+    assert result is False
 
 
 def test_verify_player_invalid_data(registry_instance):
     """Test verifying a player with invalid data."""
-    with pytest.raises(ValueError, match="Invalid"):
+    with pytest.raises(ValidationError, match="Invalid"):
         registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)

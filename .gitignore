@@ -2,6 +2,10 @@
 *.json
 /dist/
 __pycache__/
+.coverage
+
+# Generated OpenAPI/Redoc documentation output
+docs/
 
 # Secrets — never commit any of these
 .env

@@ -21,11 +21,14 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
+    "Typing :: Typed",
 ]
 dependencies = [
-    "hatchling>=1.27.0",
-    "httpx",
-    "pytest>=8.4.2",
+    # The [brotli] extra is load-bearing, not an optimisation: the base client advertises
+    # `Accept-Encoding: br,gzip,deflate` as spec v1.0.1's info.description requires, and
+    # advertising `br` without a decoder installed would leave httpx unable to read a
+    # brotli-encoded response. Resolves to `brotli` on CPython, `brotlicffi` on PyPy.
+    "httpx[brotli]",
     "sentinels",
 ]
 
@@ -58,7 +61,25 @@ style = "pep440"
 vsc = "git"
 
 [tool.hatch.build.targets.wheel]
-packages = ["."]
+packages = ["mhanndalorian_bot"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# Base rules (E, F) plus import sorting (I), flake8-bugbear (B), and
+# pyupgrade (UP). Rules are pinned explicitly so a new Ruff release that
+# changes the default rule set cannot silently alter CI results.
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ty.environment]
+python-version = "3.10"
+python = ".venv"
+
+[tool.ty.src]
+include = ["mhanndalorian_bot"]
+
 
 [tool.semantic_release]
 version_variable = [
