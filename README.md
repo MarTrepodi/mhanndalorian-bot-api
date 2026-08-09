@@ -58,6 +58,16 @@ player and may interrupt an active in-game session: `tw`, `twlogs`, `twleaderboa
 `playerarena`, `guild`, `guildleaderboard`, `database`) do not touch the game session.
 Programmatically, check `EndPoint.TW.is_authenticated`.
 
+Calling one emits a **`SessionBreakWarning`** — once per endpoint per process, not once per call,
+so a bot polling on a timer is warned rather than spammed. Silence it the usual way:
+
+```python
+import warnings
+from mhanndalorian_bot import SessionBreakWarning
+
+warnings.filterwarnings("ignore", category=SessionBreakWarning)
+```
+
 ### Error handling
 
 Everything the library raises subclasses `MBotError`, which subclasses `RuntimeError`. Below it
@@ -122,6 +132,31 @@ programming error rather than bad input, and is deliberately still a plain `Type
 Note also that `fetch_player("123-456-789")` now sends `123456789`: per-call allycodes are
 cleansed the same way constructor allycodes always were, and one that isn't 9 digits raises
 instead of reaching the server.
+
+**`fetch_player` and `fetch_guild` no longer strip the response envelope.** They were the only two
+helpers that ever did; every other helper always returned it. The envelope differs per endpoint —
+`/conquest` returns three sibling keys, `/tblogs` two — so there is no uniform thing to unwrap to,
+and returning it whole is the only rule definable across all 18 endpoints.
+
+```python
+# before 0.11.0
+name = mbot.fetch_player(allycode=...)["name"]
+guild = mbot.fetch_guild(guild_id=...)["profile"]
+
+# 0.11.0 onwards
+name = mbot.fetch_player(allycode=...)["events"]["name"]
+guild = mbot.fetch_guild(guild_id=...)["events"]["guild"]["profile"]
+```
+
+**`Registry.verify_player(primary=...)` defaults to `None`, not `False`.** With `None` the key is
+omitted from the payload entirely, letting the registry apply its documented behaviour: a user with
+no other registered accounts gets `primary: yes`. The old `False` default silently opted first-time
+users *out* of being primary. Pass `True` or `False` to state it explicitly.
+
+**Discord IDs of 17–20 digits are now accepted** (previously exactly 18). This only widens what is
+allowed, so it breaks nobody — but it is worth knowing that every Discord account created since
+~July 2022 has a 19-digit ID and was rejected outright before this release, which made `Registry`
+unusable for those users.
 
 ### Guild leaderboards and player arena
 

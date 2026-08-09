@@ -182,7 +182,8 @@ The API splits its endpoints in two, and the distinction has a user-visible cons
   `guildleaderboard`, `database`.
 
 This matters most for bots polling on a timer: each poll of an authenticated endpoint ejects the
-player from the game. Check before calling:
+player from the game. Since 0.11.0 the library says so at runtime as well as in the docstrings,
+emitting a `SessionBreakWarning` once per endpoint per process. Check before calling:
 
 ```python
 >>> EndPoint.TW.is_authenticated

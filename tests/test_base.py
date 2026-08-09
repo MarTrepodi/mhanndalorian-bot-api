@@ -47,15 +47,26 @@ def test_cleanse_discord_id_valid():
     assert result == "123456789012345678"
 
 
-def test_cleanse_discord_id_invalid_length():
-    """Test invalid Discord ID with incorrect length."""
-    with pytest.raises(ValidationError, match="Value must be exactly 18 numerical characters."):
-        MBot.cleanse_discord_id("12345678")
+@pytest.mark.parametrize("length", [17, 18, 19, 20])
+def test_cleanse_discord_id_accepts_real_snowflake_lengths(length):
+    """Snowflakes were 17 digits at Discord's 2015 launch and crossed to 19 on ~2022-07-23.
+
+    An "exactly 18" rule rejected every account created after July 2022, which made the registry
+    unusable for those users. 20 is the ceiling for an unsigned 64-bit value.
+    """
+    value = "1" * length
+    assert MBot.cleanse_discord_id(value) == value
+
+
+@pytest.mark.parametrize("length", [0, 16, 21])
+def test_cleanse_discord_id_rejects_impossible_lengths(length):
+    with pytest.raises(ValidationError, match="Value must be 17 to 20 numerical characters."):
+        MBot.cleanse_discord_id("1" * length)
 
 
 def test_cleanse_discord_id_with_non_digit_characters():
     """Test invalid Discord ID with non-digit characters."""
-    with pytest.raises(ValidationError, match="Value must be exactly 18 numerical characters."):
+    with pytest.raises(ValidationError, match="Value must be 17 to 20 numerical characters."):
         MBot.cleanse_discord_id("12345678901234567a")
 
 
@@ -300,3 +311,32 @@ def test_brotli_encoded_response_is_actually_decoded(httpx_mock: HTTPXMock):
     )
     result = API("mock_api_key", "123456789").fetch_data(endpoint="mock_endpoint")
     assert result == {"payload": {"enums": True}, "ok": True}
+
+
+@pytest.mark.parametrize("hmac_enabled", [True, False])
+def test_discord_id_reaches_both_clients_from_constructor(hmac_enabled):
+    """Regression: x-discord-id used to reach the wire only as a side effect of sign().
+
+    With hmac=False nothing ever signed, so the header was never sent at all.
+    """
+    bot = make_bot(discord_id="123456789012345678", hmac=hmac_enabled)
+    assert bot.client.headers["x-discord-id"] == "123456789012345678"
+    assert bot.aclient.headers["x-discord-id"] == "123456789012345678"
+
+
+def test_discord_id_reaches_both_clients_when_set_after_construction():
+    bot = make_bot(hmac=False)
+    assert "x-discord-id" not in bot.client.headers
+    bot.set_discord_id("123456789012345678")
+    assert bot.client.headers["x-discord-id"] == "123456789012345678"
+    assert bot.aclient.headers["x-discord-id"] == "123456789012345678"
+
+
+def test_every_header_mutator_syncs_to_the_clients():
+    """Pins the invariant _sync_headers exists to protect: self.headers == both clients'."""
+    bot = make_bot(discord_id="123456789012345678")
+    bot.set_api_key("0123456789abcdef")
+    bot.set_discord_id("987654321098765432")
+    for key, value in bot.headers.items():
+        assert bot.client.headers[key] == value, f"{key} not synced to sync client"
+        assert bot.aclient.headers[key] == value, f"{key} not synced to async client"

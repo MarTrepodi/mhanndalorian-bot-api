@@ -53,6 +53,11 @@ addopts = [
 testpaths = [
     "tests",
 ]
+filterwarnings = [
+    # Most tests call authenticated endpoints incidentally; the warning is the subject of only a
+    # few of them. pytest.warns installs its own filter, so the tests asserting it still pass.
+    "ignore::mhanndalorian_bot.exceptions.SessionBreakWarning",
+]
 
 [tool.hatch.version]
 path = 'mhanndalorian_bot/version.py'

@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import copy
 import logging
+import warnings
 from enum import Enum
 from typing import Any
 
-from mhanndalorian_bot.attrs import DefId, EndPoint, LeaderboardType
+from mhanndalorian_bot.attrs import AUTHENTICATED_ENDPOINTS, DefId, EndPoint, LeaderboardType
 from mhanndalorian_bot.base import MBot
-from mhanndalorian_bot.exceptions import ValidationError, raise_for_response
+from mhanndalorian_bot.exceptions import SessionBreakWarning, ValidationError, raise_for_response
 from mhanndalorian_bot.utils import func_timer
 
 
@@ -59,6 +60,35 @@ class API(MBot):
         return f"/api/{ep.value}" if isinstance(ep, EndPoint) else f"/api/{ep}"
 
     @staticmethod
+    def _warn_if_session_breaking(endpoint: EndPoint | str) -> None:
+        """Warn once per endpoint that an authenticated call ends the player's game session.
+
+        Spec v1.0.1 tags 13 endpoints Authenticated -- "Will break the session of the user."
+        The library's primary consumers are bots polling on a timer, where each poll ejects the
+        player from the game, so a docstring alone is easy to miss.
+
+        Python's default warning filter de-duplicates by (message, category, module, lineno), and
+        the message carries the endpoint, so each distinct authenticated endpoint warns once per
+        process rather than once per call. Silence it with the usual filters, e.g.
+        ``warnings.filterwarnings("ignore", category=SessionBreakWarning)``.
+
+        The reported location is this library, not the caller's line: ``fetch_data`` is wrapped by
+        ``func_timer``, and helpers add a further frame, so the caller sits at a stack depth that
+        varies between 4 and 5 and no single ``stacklevel`` reaches it. The endpoint name in the
+        message is what identifies the offending call.
+        """
+        slug = endpoint.value if isinstance(endpoint, EndPoint) else str(endpoint)
+        if slug not in AUTHENTICATED_ENDPOINTS:
+            return
+        warnings.warn(
+            f"'{slug}' is an authenticated endpoint: calling it will break the player's active "
+            f"Star Wars: Galaxy of Heroes session. Check EndPoint.<MEMBER>.is_authenticated to "
+            f"test this before calling.",
+            SessionBreakWarning,
+            stacklevel=2,
+        )
+
+    @staticmethod
     def _verify_allycode(allycode: str) -> str:
         """Normalise and validate a per-call allycode.
 
@@ -101,7 +131,7 @@ class API(MBot):
         payload: dict[str, Any] | None = None,
         enums: bool = False,
         user_discord_id: str | None = None,
-    ) -> dict[Any, Any]:
+    ) -> dict[Any, Any] | list[Any]:
         """Return data from the provided API endpoint using standard synchronous HTTP requests
 
         Args
@@ -121,6 +151,7 @@ class API(MBot):
             Dictionary from JSON response, if found.
         """
 
+        self._warn_if_session_breaking(endpoint)
         endpoint = self._resolve_endpoint(endpoint)
         method = (method or "POST").upper()
         is_hmac_signed = hmac if hmac is not None else self.hmac
@@ -156,8 +187,8 @@ class API(MBot):
     def fetch_tw_leaderboard(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TWLEADERBOARD, **kwargs)
@@ -165,8 +196,8 @@ class API(MBot):
     def fetch_twlogs(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TWLOGS, **kwargs)
@@ -174,8 +205,8 @@ class API(MBot):
     def fetch_tblogs(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TBLOGS, **kwargs)
@@ -183,8 +214,8 @@ class API(MBot):
     def fetch_inventory(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player INVENTORY endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.INVENTORY, **kwargs)
@@ -192,8 +223,8 @@ class API(MBot):
     def fetch_arena(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.ARENA, **kwargs)
@@ -201,8 +232,8 @@ class API(MBot):
     def fetch_tb(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TB, **kwargs)
@@ -210,8 +241,8 @@ class API(MBot):
     def fetch_tb_history(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TBHISTORY, **kwargs)
@@ -219,8 +250,8 @@ class API(MBot):
     def fetch_tw(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.TW, **kwargs)
@@ -228,8 +259,8 @@ class API(MBot):
     def fetch_raid(self, **kwargs) -> dict[Any, Any]:
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.RAID, **kwargs)
@@ -252,8 +283,6 @@ class API(MBot):
         kwargs.setdefault("enums", False)
         player = self.fetch_data(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
 
-        if isinstance(player, dict) and "events" in player:
-            return player["events"]
         return player
 
     def fetch_guild(self, guild_id: str, **kwargs) -> dict[Any, Any]:
@@ -270,15 +299,13 @@ class API(MBot):
         kwargs.setdefault("enums", False)
         guild = self.fetch_data(endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs)
 
-        if isinstance(guild, dict) and "events" in guild and "guild" in guild["events"]:
-            return guild["events"]["guild"]
         return guild
 
     def fetch_squad_presets(self, **kwargs) -> dict[Any, Any]:
         """Return data from the SQUADPRESETS endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.SQUADS, **kwargs)
@@ -286,8 +313,8 @@ class API(MBot):
     def fetch_gac(self, **kwargs) -> dict[Any, Any]:
         """Return data from the GAC endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.GAC, **kwargs)
@@ -295,8 +322,8 @@ class API(MBot):
     def fetch_conquest(self, **kwargs) -> dict[Any, Any]:
         """Return data from the CONQUEST endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.CONQUEST, **kwargs)
@@ -304,8 +331,8 @@ class API(MBot):
     def fetch_events(self, **kwargs) -> dict[Any, Any]:
         """Return data from the EVENTS endpoint listing current and upcoming game events
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return self.fetch_data(EndPoint.EVENTS, **kwargs)
@@ -436,7 +463,7 @@ class API(MBot):
         payload: dict[str, Any] | None = None,
         enums: bool = False,
         user_discord_id: str | None = None,
-    ) -> dict[Any, Any]:
+    ) -> dict[Any, Any] | list[Any]:
         """Return data from the provided API endpoint using asynchronous HTTP requests
 
         Args
@@ -455,6 +482,7 @@ class API(MBot):
         Returns
             Dictionary from JSON response.
         """
+        self._warn_if_session_breaking(endpoint)
         endpoint = self._resolve_endpoint(endpoint)
         method = (method or "POST").upper()
         is_hmac_signed = hmac if hmac is not None else self.hmac
@@ -490,8 +518,8 @@ class API(MBot):
     async def fetch_tw_leaderboard_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLEADERBOARD endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TWLEADERBOARD, **kwargs)
@@ -499,8 +527,8 @@ class API(MBot):
     async def fetch_twlogs_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TWLOGS, **kwargs)
@@ -508,8 +536,8 @@ class API(MBot):
     async def fetch_tblogs_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TBLOGS, **kwargs)
@@ -517,8 +545,8 @@ class API(MBot):
     async def fetch_inventory_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player INVENTORY endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.INVENTORY, **kwargs)
@@ -526,8 +554,8 @@ class API(MBot):
     async def fetch_arena_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.ARENA, **kwargs)
@@ -535,8 +563,8 @@ class API(MBot):
     async def fetch_tb_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TB, **kwargs)
@@ -544,8 +572,8 @@ class API(MBot):
     async def fetch_tb_history_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TBHISTORY, **kwargs)
@@ -553,8 +581,8 @@ class API(MBot):
     async def fetch_tw_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.TW, **kwargs)
@@ -562,8 +590,8 @@ class API(MBot):
     async def fetch_raid_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.RAID, **kwargs)
@@ -588,8 +616,6 @@ class API(MBot):
         kwargs.setdefault("enums", False)
         player = await self.fetch_data_async(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
 
-        if isinstance(player, dict) and "events" in player:
-            return player["events"]
         return player
 
     async def fetch_guild_async(self, guild_id: str, **kwargs) -> dict[Any, Any]:
@@ -608,15 +634,13 @@ class API(MBot):
             endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs
         )
 
-        if isinstance(guild, dict) and "events" in guild and "guild" in guild["events"]:
-            return guild["events"]["guild"]
         return guild
 
     async def fetch_squad_presets_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the SQUADPRESETS endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.SQUADS, **kwargs)
@@ -624,8 +648,8 @@ class API(MBot):
     async def fetch_gac_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the GAC endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.GAC, **kwargs)
@@ -633,8 +657,8 @@ class API(MBot):
     async def fetch_conquest_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the CONQUEST endpoint
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.CONQUEST, **kwargs)
@@ -642,8 +666,8 @@ class API(MBot):
     async def fetch_events_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the EVENTS endpoint listing current and upcoming game events
 
-        Authenticated endpoint: uses the registered player's EA session and may interrupt an
-        active game session.
+        Authenticated endpoint: uses the registered player's EA session and **will break** the
+        player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
         return await self.fetch_data_async(EndPoint.EVENTS, **kwargs)

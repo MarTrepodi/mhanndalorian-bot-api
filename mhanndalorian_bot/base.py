@@ -119,6 +119,17 @@ class MBot:
         if isinstance(hmac, bool):
             self.hmac = hmac
 
+    def _sync_headers(self) -> None:
+        """Push ``self.headers`` onto both httpx clients.
+
+        The clients copy headers at construction, so mutating ``self.headers`` afterwards has no
+        effect until they are pushed. Every method that mutates ``self.headers`` must call this --
+        a mutator that forgets silently drops its header from every request, which is exactly how
+        ``x-discord-id`` came to never reach the wire on the api-key auth path.
+        """
+        self.client.headers = self.headers
+        self.aclient.headers = self.headers
+
     def _build_clients(self) -> None:
         """Construct the instance httpx clients from the stored timeout/retries/verify settings."""
         client_kwargs: dict[str, Any] = {
@@ -205,16 +216,21 @@ class MBot:
     @staticmethod
     @func_debug_logger
     def cleanse_discord_id(discord_id: str) -> str:
-        """Validate that discord ID is an 18 character string of only numerical digits
+        """Validate that a Discord ID is a plausible snowflake: 17 to 20 digits.
+
+        Discord snowflakes are 64-bit. They were 17 digits at Discord's 2015 launch, crossed to
+        18, and crossed to 19 on ~2022-07-23; 20 digits is the ceiling for an unsigned 64-bit
+        value. An earlier "exactly 18" rule rejected every account created after July 2022 as
+        well as the earliest accounts, which made the registry unusable for those users.
 
         Raises:
-            ValidationError: if the value is not a string of exactly 18 digits.
+            ValidationError: if the value is not a string of 17 to 20 digits.
         """
         if not isinstance(discord_id, str):
             raise ValidationError(f"{discord_id} must be a string, not type: {type(discord_id)}")
 
-        if not discord_id.isdigit() or len(discord_id) != 18:
-            raise ValidationError(f"Invalid Discord ID ({discord_id}): Value must be exactly 18 numerical characters.")
+        if not discord_id.isdigit() or not (17 <= len(discord_id) <= 20):
+            raise ValidationError(f"Invalid Discord ID ({discord_id}): Value must be 17 to 20 numerical characters.")
 
         return discord_id
 
@@ -237,8 +253,7 @@ class MBot:
         self.api_key = api_key
 
         self.headers["api-key"] = self.api_key
-        self.client.headers = self.headers
-        self.aclient.headers = self.headers
+        self._sync_headers()
 
     @func_debug_logger
     def set_allycode(self, allycode: str) -> None:
@@ -257,6 +272,7 @@ class MBot:
         discord_id = self.cleanse_discord_id(discord_id)
 
         self.headers["x-discord-id"] = discord_id
+        self._sync_headers()
 
     @func_debug_logger
     def set_api_host(self, api_host: str) -> None:
@@ -295,8 +311,7 @@ class MBot:
         self.headers.pop("Authorization", None)
         self.headers.pop("x-timestamp", None)
         self.headers["api-key"] = self.api_key
-        self.client.headers = self.headers
-        self.aclient.headers = self.headers
+        self._sync_headers()
 
     @func_debug_logger
     def set_client(self, **kwargs: Any) -> None:
@@ -371,8 +386,7 @@ class MBot:
         hmac_obj.update(payload_hash_digest.encode())
 
         self.headers["Authorization"] = hmac_obj.hexdigest()
-        self.client.headers = self.headers
-        self.aclient.headers = self.headers
+        self._sync_headers()
         if debug_enabled:
             self.logger.debug(
                 f"HTTP client headers updated with HMAC signature: {_redact_headers(self.client.headers)}"
