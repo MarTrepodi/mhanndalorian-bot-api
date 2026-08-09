@@ -14,7 +14,7 @@ from typing import Any
 import httpx
 from sentinels import Sentinel
 
-from mhanndalorian_bot.attrs import APIKey, AllyCode, EndPoint
+from mhanndalorian_bot.attrs import AllyCode, APIKey, EndPoint
 from mhanndalorian_bot.utils import func_debug_logger, func_timer
 
 NotSet = Sentinel('NotSet')
@@ -85,13 +85,13 @@ class MBot:
         if verify is not True:
             self.set_verify(verify)
 
-    def __enter__(self) -> "MBot":
+    def __enter__(self) -> MBot:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    async def __aenter__(self) -> "MBot":
+    async def __aenter__(self) -> MBot:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
@@ -167,7 +167,7 @@ class MBot:
         if not isinstance(api_key, str):
             raise ValueError("api_key must be a string")
 
-        setattr(self, "api_key", api_key)
+        self.api_key = api_key
 
         self.headers["api-key"] = self.api_key
         self.client.headers = self.headers
@@ -179,7 +179,7 @@ class MBot:
 
         allycode = self.cleanse_allycode(allycode)
 
-        setattr(self, "allycode", allycode)
+        self.allycode = allycode
 
         self.payload["payload"]["allyCode"] = allycode
 
@@ -198,7 +198,7 @@ class MBot:
         if not isinstance(api_host, str):
             raise ValueError("api_host must be a string")
 
-        setattr(self, "api_host", api_host)
+        self.api_host = api_host
 
         self.client.base_url = f"{api_host}"
         self.aclient.base_url = f"{api_host}"

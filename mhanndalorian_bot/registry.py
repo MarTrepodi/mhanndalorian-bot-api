@@ -4,13 +4,13 @@ Class definition for SWGOH MHanndalorian Bot player registry service
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import httpx
 
-from mhanndalorian_bot.base import MBot
 from mhanndalorian_bot.attrs import EndPoint
+from mhanndalorian_bot.base import MBot
 from mhanndalorian_bot.utils import func_timer
 
 
@@ -68,7 +68,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_data = resp.json()
@@ -103,7 +103,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
@@ -135,7 +135,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: "httpx.Response" = self.client.post(endpoint, json=payload)
+        resp: httpx.Response = self.client.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
@@ -172,7 +172,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        result: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        result: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if result.status_code == 200:
             resp_data = result.json()
@@ -205,7 +205,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             return resp.json()
@@ -240,7 +240,7 @@ class Registry(MBot):
         if hmac or self.hmac is True:
             self.sign(method='POST', endpoint=endpoint, payload=payload)
 
-        resp: "httpx.Response" = await self.aclient.post(endpoint, json=payload)
+        resp: httpx.Response = await self.aclient.post(endpoint, json=payload)
 
         if resp.status_code == 200:
             resp_json = resp.json()
