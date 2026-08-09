@@ -1,12 +1,20 @@
-# coding=utf-8
 """
 Example script for getting data for the currently active raid
+
+Note: `activeraid` is an *authenticated* endpoint, so this call will break the player's
+active game session. See Library_Details.md for the full list.
 """
-from mhanndalorian_bot import API
 
-mbot = API(api_key="YOUR_API_KEY", allycode="YOUR_ALLYCODE")
+from mhanndalorian_bot import API, APIResponseError, ValidationError
 
-raid = mbot.fetch_raid()
+# The context manager closes the underlying httpx clients on exit.
+try:
+    with API(api_key="YOUR_API_KEY", allycode="YOUR_ALLYCODE") as mbot:
+        raid = mbot.fetch_raid()
+except ValidationError as exc:
+    raise SystemExit(f"Bad input: {exc}") from exc
+except APIResponseError as exc:
+    raise SystemExit(f"API error {exc.status_code} from {exc.endpoint}: {exc.response_text}") from exc
 
 """
 Sample output:
