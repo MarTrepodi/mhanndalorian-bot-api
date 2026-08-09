@@ -7,16 +7,23 @@ from abc import ABC, abstractmethod
 from enum import Enum, IntEnum
 from typing import Any
 
+from mhanndalorian_bot.exceptions import ValidationError
+
 __all__ = [
     "APIKey",
     "AllyCode",
     "AUTHENTICATED_ENDPOINTS",
+    "DEF_ID_ENUM_BY_LEADERBOARD_TYPE",
     "Debug",
+    "DefId",
+    "GuildRaidDefId",
     "HMAC",
     "Headers",
     "LeaderboardType",
     "Payload",
     "EndPoint",
+    "TerritoryBattleDefId",
+    "TerritoryWarDefId",
 ]
 
 logger = logging.getLogger(__name__)
@@ -45,7 +52,7 @@ class APIKey(ManagedAttribute):
 
     def validate(self, value):
         if not isinstance(value, str):
-            raise AttributeError(f"{value} must be a string, not type:{type(value)}")
+            raise ValidationError(f"{value} must be a string, not type:{type(value)}")
 
 
 class AllyCode(ManagedAttribute, str):
@@ -54,9 +61,9 @@ class AllyCode(ManagedAttribute, str):
 
     def validate(self, value):
         if not isinstance(value, str):
-            raise AttributeError(f"{value} must be a string, not type:{type(value)}")
+            raise ValidationError(f"{value} must be a string, not type:{type(value)}")
         if not value.isdigit() or len(value) != 9:
-            raise AttributeError(f"Invalid allyCode ({value}): Value must be exactly 9 numerical characters.")
+            raise ValidationError(f"Invalid allyCode ({value}): Value must be exactly 9 numerical characters.")
 
 
 class Debug(ManagedAttribute):
@@ -65,7 +72,7 @@ class Debug(ManagedAttribute):
 
     def validate(self, value):
         if not isinstance(value, bool):
-            raise AttributeError(f"{value} must be a boolean, not type:{type(value)}")
+            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
 
 
 class HMAC(ManagedAttribute):
@@ -74,7 +81,7 @@ class HMAC(ManagedAttribute):
 
     def validate(self, value):
         if not isinstance(value, bool):
-            raise AttributeError(f"{value} must be a boolean, not type:{type(value)}")
+            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
 
 
 class Headers(dict):
@@ -131,7 +138,17 @@ class EndPoint(Enum):
 
     @staticmethod
     def get_endpoints():
-        """Return a list of all endpoint names"""
+        """Return a list of all endpoint **names**, aliases included.
+
+        This is 21 names over 19 distinct slugs (the 18 API spec paths plus the registry's
+        ``comlink``): ``ARENA`` and ``LEADERBOARD`` share ``"leaderboard"``, and ``VERIFY``
+        and ``REGISTER`` share ``"comlink"``. That is deliberate -- the aliases are part of
+        the public surface, so a helper advertising "all endpoint names" has to list them,
+        and dropping either would hide a name callers write in their own code.
+
+        Callers who want the distinct slugs should iterate the enum instead, which skips
+        aliases by definition: ``[member.value for member in EndPoint]``.
+        """
         return [name for name, member in EndPoint.__members__.items()]
 
     @property
@@ -149,6 +166,68 @@ class LeaderboardType(IntEnum):
     GUILD_TERRITORY_BATTLE_STARS = 4
     GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER = 5
     GUILD_RAID_HIGH_WATERMARK = 6
+
+    @property
+    def def_id_enum(self) -> type[Enum] | None:
+        """The enum of legal ``defId`` values for this leaderboard type.
+
+        ``None`` for the types that take no ``defId`` (0, 1 and 3).
+        """
+        return DEF_ID_ENUM_BY_LEADERBOARD_TYPE.get(self)
+
+    @property
+    def requires_def_id(self) -> bool:
+        """True if the API requires a ``defId`` alongside this leaderboard type."""
+        return self in DEF_ID_ENUM_BY_LEADERBOARD_TYPE
+
+
+class TerritoryBattleDefId(Enum):
+    """Legal ``defId`` values for ``LeaderboardType.GUILD_TERRITORY_BATTLE_STARS`` (type 4).
+
+    The API spec pins the raw tokens without describing which Territory Battle each maps to,
+    so the member names mirror the tokens verbatim.
+    """
+
+    T01D = "t01D"
+    T04D = "t04D"
+    T05D = "t05D"
+
+
+class TerritoryWarDefId(Enum):
+    """Legal ``defId`` values for ``LeaderboardType.GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER`` (type 5)."""
+
+    TERRITORY_WAR_LEADERBOARD = "TERRITORY_WAR_LEADERBOARD"
+
+
+class GuildRaidDefId(Enum):
+    """Legal ``defId`` values for ``LeaderboardType.GUILD_RAID_HIGH_WATERMARK`` (type 6)."""
+
+    RANCOR_DIFF01 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF01"
+    RANCOR_DIFF02 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF02"
+    RANCOR_DIFF03 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF03"
+    RANCOR_DIFF04 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF04"
+    RANCOR_DIFF05 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF05"
+    RANCOR_DIFF06 = "GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF06"
+    AAT_DIFF06 = "GUILD:RAIDS:NORMAL_DIFF:AAT:DIFF06"
+    AAT_HEROIC80 = "GUILD:RAIDS:NORMAL_DIFF:AAT:HEROIC80"
+    SITH_RAID_DIFF06 = "GUILD:RAIDS:NORMAL_DIFF:SITH_RAID:DIFF06"
+    SITH_RAID_HEROIC85 = "GUILD:RAIDS:NORMAL_DIFF:SITH_RAID:HEROIC85"
+    KRAYTDRAGON_DIFF01 = "GUILD:RAIDS:NORMAL_DIFF:KRAYTDRAGON:DIFF01"
+    ROTJ_SPEEDERBIKE = "GUILD:RAIDS:NORMAL_DIFF:ROTJ:SPEEDERBIKE"
+    NABOO_NABOO = "GUILD:RAIDS:NORMAL_DIFF:NABOO:NABOO"
+    ORDER66_DIFF01 = "GUILD:RAIDS:NORMAL_DIFF:ORDER66:DIFF01"
+
+
+# Any of the three per-leaderboard-type ``defId`` enums; use for annotations accepting a defId.
+DefId = TerritoryBattleDefId | TerritoryWarDefId | GuildRaidDefId
+
+# The spec's /guildleaderboard oneOf: leaderboard types 4, 5 and 6 each require a defId drawn
+# from their own distinct enum. Types 0, 1 and 3 are absent here - they accept no defId at all.
+DEF_ID_ENUM_BY_LEADERBOARD_TYPE: dict[LeaderboardType, type[Enum]] = {
+    LeaderboardType.GUILD_TERRITORY_BATTLE_STARS: TerritoryBattleDefId,
+    LeaderboardType.GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER: TerritoryWarDefId,
+    LeaderboardType.GUILD_RAID_HIGH_WATERMARK: GuildRaidDefId,
+}
 
 
 # Endpoints that authenticate as the registered player and use their EA session.

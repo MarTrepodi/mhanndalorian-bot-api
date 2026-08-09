@@ -16,12 +16,19 @@ import httpx
 from sentinels import Sentinel
 
 from mhanndalorian_bot.attrs import AllyCode, APIKey, EndPoint
-from mhanndalorian_bot.utils import func_debug_logger, func_timer
+from mhanndalorian_bot.exceptions import ValidationError
+from mhanndalorian_bot.utils import func_debug_logger, func_timer, redact_secret
 
 NotSet = Sentinel("NotSet")
 
 _REDACTED = "[REDACTED]"
 _SENSITIVE_HEADER_KEYS = frozenset({"api-key", "authorization", "x-discord-id"})
+
+# Spec v1.0.1 info.description: "Send `Content-Type: application/json` and
+# `Accept-Encoding: br,gzip,deflate`." Sent verbatim rather than left to httpx's default
+# (which is derived from the installed decoders and orders gzip first). Advertising `br`
+# is only safe because the `httpx[brotli]` extra is a hard dependency -- see pyproject.toml.
+ACCEPT_ENCODING = "br,gzip,deflate"
 
 
 def _redact_headers(headers: dict[str, str] | httpx.Headers) -> dict[str, str]:
@@ -82,11 +89,14 @@ class MBot:
         discord_id = discord_id or os.environ.get("MHANN_DISCORD_ID")
 
         if not api_key:
-            raise ValueError("api_key is required (argument or MHANN_API_KEY environment variable)")
+            raise ValidationError("api_key is required (argument or MHANN_API_KEY environment variable)")
         if not allycode:
-            raise ValueError("allycode is required (argument or MHANN_ALLYCODE environment variable)")
+            raise ValidationError("allycode is required (argument or MHANN_ALLYCODE environment variable)")
 
-        self.headers: dict[str, str] = {"Content-Type": "application/json"}
+        self.headers: dict[str, str] = {
+            "Content-Type": "application/json",
+            "Accept-Encoding": ACCEPT_ENCODING,
+        }
         self.payload: dict[str, Any] = {"payload": {"allyCode": ""}}
 
         if isinstance(api_host, str):
@@ -154,6 +164,9 @@ class MBot:
         Returns:
             str: human-readable time string
 
+        Raises:
+            ValidationError: if `unix_time` is not a non-zero int or float.
+
         Notes:
             If the provided unix time is invalid or an error occurs, the default time string returned
             is 1970-01-01 00:00:00
@@ -161,7 +174,7 @@ class MBot:
         """
         if not isinstance(unix_time, (int, float)) or not unix_time:
             err_msg = "A valid integer or float 'unix_time' argument is required."
-            raise ValueError(err_msg)
+            raise ValidationError(err_msg)
         from datetime import datetime, timezone
 
         if isinstance(unix_time, float):
@@ -173,39 +186,53 @@ class MBot:
     @staticmethod
     @func_debug_logger
     def cleanse_allycode(allycode: str) -> str:
-        """Remove any dashes from provided string and verify the result contains exactly 9 digits"""
+        """Remove any dashes from provided string and verify the result contains exactly 9 digits
+
+        Raises:
+            ValidationError: if the value is not a string, or is not exactly 9 digits once
+                             dashes are stripped.
+        """
         if not isinstance(allycode, str):
-            raise ValueError(f"{allycode} must be a string, not type:{type(allycode)}")
+            raise ValidationError(f"{allycode} must be a string, not type:{type(allycode)}")
 
         allycode = allycode.replace("-", "")
 
         if not allycode.isdigit() or len(allycode) != 9:
-            raise ValueError(f"Invalid allyCode ({allycode}): Value must be exactly 9 numerical characters.")
+            raise ValidationError(f"Invalid allyCode ({allycode}): Value must be exactly 9 numerical characters.")
 
         return allycode
 
     @staticmethod
     @func_debug_logger
     def cleanse_discord_id(discord_id: str) -> str:
-        """Validate that discord ID is an 18 character string of only numerical digits"""
+        """Validate that discord ID is an 18 character string of only numerical digits
+
+        Raises:
+            ValidationError: if the value is not a string of exactly 18 digits.
+        """
         if not isinstance(discord_id, str):
-            raise ValueError(f"{discord_id} must be a string, not type: {type(discord_id)}")
+            raise ValidationError(f"{discord_id} must be a string, not type: {type(discord_id)}")
 
         if not discord_id.isdigit() or len(discord_id) != 18:
-            raise ValueError(f"Invalid Discord ID ({discord_id}): Value must be exactly 18 numerical characters.")
+            raise ValidationError(f"Invalid Discord ID ({discord_id}): Value must be exactly 18 numerical characters.")
 
         return discord_id
 
     def get_api_key(self) -> str:
-        """Return masked API key for logging purposes."""
-        return f"{'*' * 4 + self.api_key[-4:]}"
+        """Return the stored API key masked for logging purposes.
+
+        Reveals at most ``len(api_key) // 4`` trailing characters -- see
+        :func:`mhanndalorian_bot.utils.redact_secret`. A 16-character key logs as
+        ``***efgh``; anything under 4 characters logs as ``***``.
+        """
+        return redact_secret(self.api_key)
 
     @func_debug_logger
     def set_api_key(self, api_key: str) -> None:
         """Set the api_key value for the container class and update relevant attributes (including headers)"""
 
         if not isinstance(api_key, str):
-            raise ValueError("api_key must be a string")
+            raise ValidationError("api_key must be a string")
 
         self.api_key = api_key
 
@@ -236,7 +263,7 @@ class MBot:
         """Set the api_host value for the container class and update relevant attributes"""
 
         if not isinstance(api_host, str):
-            raise ValueError("api_host must be a string")
+            raise ValidationError("api_host must be a string")
 
         self.api_host = api_host
 
@@ -319,7 +346,7 @@ class MBot:
 
         if api_key:
             if debug_enabled:
-                self.logger.debug(f"Using provided API key: [{self.get_api_key()}]")
+                self.logger.debug(f"Using provided API key: [{redact_secret(api_key)}]")
             a_key = api_key.encode()
         else:
             if debug_enabled:

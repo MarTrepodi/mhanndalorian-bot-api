@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 from mhanndalorian_bot.attrs import EndPoint
 from mhanndalorian_bot.base import MBot
-from mhanndalorian_bot.exceptions import raise_for_response
+from mhanndalorian_bot.exceptions import ValidationError, raise_for_response
 from mhanndalorian_bot.utils import func_timer
 
 
@@ -50,12 +50,16 @@ class Registry(MBot):
 
     @func_timer
     def validate_arguments(self, allycode: str | None, discord_id: str | None) -> str:
-        """Validate provided arguments for the player registry service"""
+        """Validate provided arguments for the player registry service
+
+        Raises:
+            ValidationError: if neither or both identifiers are supplied, or either is malformed.
+        """
         if not allycode and not discord_id:
-            raise ValueError("At least one of allycode or discord_id must be provided.")
+            raise ValidationError("At least one of allycode or discord_id must be provided.")
 
         if allycode and discord_id:
-            raise ValueError("Only one of allycode or discord_id can be provided.")
+            raise ValidationError("Only one of allycode or discord_id can be provided.")
 
         cleansed_allycode = self.cleanse_allycode(allycode) if allycode else None
         cleansed_discord_id = self.cleanse_discord_id(discord_id) if discord_id else None

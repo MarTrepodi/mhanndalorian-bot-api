@@ -3,6 +3,7 @@ import json
 import pytest
 from pytest_httpx import HTTPXMock
 
+from mhanndalorian_bot.exceptions import ValidationError
 from mhanndalorian_bot.registry import Registry
 
 
@@ -22,7 +23,7 @@ def test_mock_fetch_player_valid_allycode(httpx_mock: HTTPXMock, registry_instan
 
 def test_fetch_player_invalid_allycode(httpx_mock: HTTPXMock, registry_instance):
     """Test fetching a player with an invalid allycode."""
-    with pytest.raises(ValueError, match="Invalid allyCode"):
+    with pytest.raises(ValidationError, match="Invalid allyCode"):
         registry_instance.fetch_player(allycode="invalid_allycode", hmac=True)
 
 
@@ -44,7 +45,7 @@ def test_register_player_valid_data(httpx_mock: HTTPXMock, registry_instance):
 
 def test_register_player_invalid_data(registry_instance):
     """Test registering a player with invalid data."""
-    with pytest.raises(ValueError, match="Invalid"):
+    with pytest.raises(ValidationError, match="Invalid"):
         registry_instance.register_player(discord_id="", allycode="invalid_allycode", hmac=True)
 
 
@@ -79,5 +80,5 @@ def test_verify_player_not_verified(httpx_mock: HTTPXMock, registry_instance):
 
 def test_verify_player_invalid_data(registry_instance):
     """Test verifying a player with invalid data."""
-    with pytest.raises(ValueError, match="Invalid"):
+    with pytest.raises(ValidationError, match="Invalid"):
         registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)

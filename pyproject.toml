@@ -24,7 +24,11 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "httpx",
+    # The [brotli] extra is load-bearing, not an optimisation: the base client advertises
+    # `Accept-Encoding: br,gzip,deflate` as spec v1.0.1's info.description requires, and
+    # advertising `br` without a decoder installed would leave httpx unable to read a
+    # brotli-encoded response. Resolves to `brotli` on CPython, `brotlicffi` on PyPy.
+    "httpx[brotli]",
     "sentinels",
 ]
 

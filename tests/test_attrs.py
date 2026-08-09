@@ -21,6 +21,18 @@ def test_get_endpoints_includes_aliases():
         assert expected in names
 
 
+def test_get_endpoints_is_names_not_slugs():
+    """21 names over 19 distinct slugs, as the docstring promises; iterating skips aliases."""
+    names = EndPoint.get_endpoints()
+    slugs = [member.value for member in EndPoint]
+
+    assert len(names) == 21
+    assert len(set(names)) == 21, "names are unique even though two pairs share a slug"
+    assert len(slugs) == len(set(slugs)) == 19, "18 spec paths plus the registry's 'comlink'"
+    assert set(slugs) == {member.value for member in EndPoint.__members__.values()}
+    assert {"LEADERBOARD", "ARENA"} <= set(names) and {"REGISTER", "VERIFY"} <= set(names)
+
+
 def test_leaderboard_type_values():
     assert LeaderboardType.UNSPECIFIED == 0
     assert LeaderboardType.GUILD_RAID_ALL_COMP_PTS == 1

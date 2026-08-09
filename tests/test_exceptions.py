@@ -3,6 +3,7 @@
 import pytest
 from pytest_httpx import HTTPXMock
 
+import mhanndalorian_bot
 from mhanndalorian_bot import (
     API,
     APIResponseError,
@@ -11,6 +12,7 @@ from mhanndalorian_bot import (
     BadRequestError,
     MBotError,
     Registry,
+    ValidationError,
 )
 
 STATUS_TO_EXC = [
@@ -33,9 +35,44 @@ def registry_instance():
 
 def test_hierarchy_is_runtime_error_compatible():
     """All exceptions must remain catchable as RuntimeError."""
-    for exc_cls in (MBotError, APIResponseError, BadRequestError, AuthenticationError, AuthorizationError):
+    for exc_cls in (
+        MBotError,
+        APIResponseError,
+        BadRequestError,
+        AuthenticationError,
+        AuthorizationError,
+        ValidationError,
+    ):
         assert issubclass(exc_cls, RuntimeError)
         assert issubclass(exc_cls, MBotError)
+
+
+def test_validation_error_is_a_sibling_of_api_response_error():
+    """ValidationError sits directly under MBotError, not under the response-error branch.
+
+    An input rejected locally carries no status_code / endpoint / response_text, so it must
+    not be catchable as APIResponseError.
+    """
+    assert issubclass(ValidationError, MBotError)
+    assert not issubclass(ValidationError, APIResponseError)
+    assert ValidationError.__bases__ == (MBotError,)
+
+
+def test_validation_error_does_not_subclass_valueerror_or_typeerror():
+    """The v0.11.0 breaking change, pinned: `except ValueError:` no longer catches."""
+    assert not issubclass(ValidationError, ValueError)
+    assert not issubclass(ValidationError, TypeError)
+
+    with pytest.raises(ValidationError):
+        try:
+            API.cleanse_allycode("not-a-code")
+        except (ValueError, TypeError) as exc:  # pragma: no cover - must not be reached
+            raise AssertionError(f"ValidationError was caught as {type(exc).__name__}") from exc
+
+
+def test_validation_error_exported_from_package_root():
+    assert mhanndalorian_bot.ValidationError is ValidationError
+    assert "ValidationError" in mhanndalorian_bot.__all__
 
 
 @pytest.mark.parametrize("status_code, exc_cls", STATUS_TO_EXC)

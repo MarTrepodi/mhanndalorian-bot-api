@@ -6,16 +6,21 @@ from __future__ import annotations
 
 import copy
 import logging
+from enum import Enum
 from typing import Any
 
-from mhanndalorian_bot.attrs import EndPoint, LeaderboardType
+from mhanndalorian_bot.attrs import DefId, EndPoint, LeaderboardType
 from mhanndalorian_bot.base import MBot
-from mhanndalorian_bot.exceptions import raise_for_response
+from mhanndalorian_bot.exceptions import ValidationError, raise_for_response
 from mhanndalorian_bot.utils import func_timer
 
 
 def _payload_with_enums(payload: dict[str, Any], enums: bool) -> dict[str, Any]:
     """Return a deep copy of ``payload`` with the ``enums`` flag set under ``payload.payload``.
+
+    Per spec v1.0.1 (``components.requestBodies.*.payload.properties.enums``): ``True`` asks the
+    API to return enum fields as string **names**, ``False`` as integer **values** -- not the
+    other way round.
 
     Does not mutate the caller's dictionary.
     """
@@ -28,13 +33,14 @@ def _player_identity_payload(allycode: str | None, player_id: str | None, defaul
     """Build the inner payload for endpoints accepting either an allycode or a player ID.
 
     The two identifiers are mutually exclusive; falls back to ``default_allycode`` when
-    neither is provided.
+    neither is provided. A supplied allycode is cleansed exactly as a constructor allycode
+    is, so ``"123-456-789"`` reaches the wire as ``"123456789"`` through either door.
     """
     if allycode and player_id:
-        raise ValueError("allycode and player_id are mutually exclusive; provide only one")
+        raise ValidationError("allycode and player_id are mutually exclusive; provide only one")
     if player_id:
         if not isinstance(player_id, str):
-            raise TypeError("player_id must be a string")
+            raise ValidationError("player_id must be a string")
         return {"playerId": player_id}
     return {"allyCode": API._verify_allycode(allycode) if allycode else default_allycode}
 
@@ -54,20 +60,35 @@ class API(MBot):
 
     @staticmethod
     def _verify_allycode(allycode: str) -> str:
-        """Verify that the provided allycode is a string and is not empty."""
-        if not isinstance(allycode, str):
-            raise TypeError("allycode must be a string")
-        if not allycode:
-            raise ValueError("allycode cannot be empty")
-        return allycode
+        """Normalise and validate a per-call allycode.
+
+        Delegates to :meth:`MBot.cleanse_allycode` so a per-call allycode is subject to
+        exactly the rules a constructor allycode is: dashes stripped, then 9 digits
+        required. Previously this checked only "is a non-empty string", so
+        ``fetch_player("123-456-789")`` put the dashes on the wire while
+        ``API(allycode="123-456-789")`` normalised them away.
+
+        Raises:
+            ValidationError: if the value is not a string of 9 digits once dashes are stripped.
+        """
+        return MBot.cleanse_allycode(allycode)
 
     @staticmethod
     def _verify_guild_id(guild_id: str) -> str:
-        """Verify that the provided guild_id is a string and is not empty."""
+        """Verify that the provided guild_id is a string and is not empty.
+
+        Guild IDs are opaque server-issued tokens (spec example: ``B2-VYdu3SEevuO3NTCW52Q``)
+        declared only as ``{"type": "string"}`` -- no pattern, length or format. Dashes are
+        legitimate content, so there is no cleansing step to mirror here and no format rule
+        the spec would support inventing. Non-empty string is the whole contract.
+
+        Raises:
+            ValidationError: if the value is not a string, or is empty.
+        """
         if not isinstance(guild_id, str):
-            raise TypeError("guild_id must be a string")
+            raise ValidationError("guild_id must be a string")
         if not guild_id:
-            raise ValueError("guild_id cannot be empty")
+            raise ValidationError("guild_id cannot be empty")
         return guild_id
 
     @func_timer
@@ -90,7 +111,9 @@ class API(MBot):
             method: HTTP method as a string, defaults to POST
             hmac: Boolean flag indicating whether the endpoints requires HMAC signature authentication
             payload: Dictionary of payload data to be sent with the request, defaults to empty dict.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            enums: How enum fields come back in the response. ``True`` returns them as string
+                   **names** (e.g. ``"UNITSTATTYPE_HEALTH"``); ``False`` (the default) returns
+                   them as integer **values** (e.g. ``1``).
             user_discord_id: Discord ID of the user the request is made on behalf of. Requires an
                              application approved to act as other users; forces HMAC signing.
 
@@ -221,10 +244,13 @@ class API(MBot):
 
         Keyword Args
             player_id: Player ID as a string, mutually exclusive with allycode.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data`, which defines the accepted set
+                      (``method``, ``hmac``, ``enums``, ``user_discord_id``). Unknown keywords
+                      raise ``TypeError`` there.
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
-        enums = kwargs.setdefault("enums", False)
-        player = self.fetch_data(endpoint=EndPoint.PLAYER, payload={"payload": identity}, enums=enums)
+        kwargs.setdefault("enums", False)
+        player = self.fetch_data(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
 
         if isinstance(player, dict) and "events" in player:
             return player["events"]
@@ -234,12 +260,15 @@ class API(MBot):
         """Return data from the GUILD endpoint for the provided guild
 
         Non-authenticated endpoint: does not use the player's EA game session.
+
+        Keyword Args
+            **kwargs: Forwarded verbatim to :meth:`fetch_data`, which defines the accepted set
+                      (``method``, ``hmac``, ``enums``, ``user_discord_id``). Unknown keywords
+                      raise ``TypeError`` there.
         """
         validated_guild_id = self._verify_guild_id(guild_id)
-        enums = kwargs.setdefault("enums", False)
-        guild = self.fetch_data(
-            endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, enums=enums
-        )
+        kwargs.setdefault("enums", False)
+        guild = self.fetch_data(endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs)
 
         if isinstance(guild, dict) and "events" in guild and "guild" in guild["events"]:
             return guild["events"]["guild"]
@@ -286,8 +315,8 @@ class API(MBot):
         leaderboard_type: LeaderboardType | int,
         *,
         count: int = 50,
-        def_id: str | None = None,
-        enums: bool = False,
+        def_id: DefId | str | None = None,
+        **kwargs,
     ) -> dict[Any, Any]:
         """Return data from the GUILDLEADERBOARD endpoint
 
@@ -298,15 +327,27 @@ class API(MBot):
 
         Keyword Args
             count: Number of leaderboard entries to return, between 1 and 200. Default: 50
-            def_id: Leaderboard definition ID (e.g. ``GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF01``).
-                    Required by the API for raid-based leaderboard types.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            def_id: Leaderboard definition ID, as an enum member or its raw string value. Each
+                    leaderboard type is coupled to its own enum of legal values:
+                    type 4 (GUILD_TERRITORY_BATTLE_STARS) requires a ``TerritoryBattleDefId``,
+                    type 5 (GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER) a ``TerritoryWarDefId``,
+                    type 6 (GUILD_RAID_HIGH_WATERMARK) a ``GuildRaidDefId``
+                    (e.g. ``GuildRaidDefId.RANCOR_DIFF01``). Types 0, 1 and 3 accept no def_id.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data`, which defines the accepted set
+                      (``method``, ``hmac``, ``enums``, ``user_discord_id``). ``enums`` defaults
+                      to False; unknown keywords raise ``TypeError`` there.
+
+        Raises
+            ValidationError: if leaderboard_type is not a legal type, count is out of bounds,
+                        or def_id is missing, unexpected, or not a legal value for the given
+                        leaderboard type.
         """
         payload = self._build_guild_leaderboard_payload(leaderboard_type, count, def_id)
-        return self.fetch_data(EndPoint.GUILDLEADERBOARD, payload=payload, enums=enums)
+        kwargs.setdefault("enums", False)
+        return self.fetch_data(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs)
 
     def fetch_player_arena(
-        self, allycode: str | None = None, *, player_id: str | None = None, enums: bool = False
+        self, allycode: str | None = None, *, player_id: str | None = None, **kwargs
     ) -> dict[Any, Any]:
         """Return data from the PLAYERARENA endpoint for the provided allycode or player ID
 
@@ -318,24 +359,70 @@ class API(MBot):
 
         Keyword Args
             player_id: Player ID as a string, mutually exclusive with allycode.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data`, which defines the accepted set
+                      (``method``, ``hmac``, ``enums``, ``user_discord_id``). ``enums`` defaults
+                      to False; unknown keywords raise ``TypeError`` there.
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
-        return self.fetch_data(EndPoint.PLAYERARENA, payload={"payload": identity}, enums=enums)
+        kwargs.setdefault("enums", False)
+        return self.fetch_data(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs)
+
+    @staticmethod
+    def _resolve_def_id(leaderboard_type: LeaderboardType, def_id: DefId | str | None) -> str | None:
+        """Validate ``def_id`` against ``leaderboard_type`` and return its raw string value.
+
+        Enforces the spec's ``oneOf`` coupling: leaderboard types 4, 5 and 6 each require a
+        ``defId`` drawn from their own distinct enum, while types 0, 1 and 3 accept none.
+        Accepts either an enum member or its raw string value.
+        """
+        def_id_enum = leaderboard_type.def_id_enum
+
+        if def_id_enum is None:
+            if def_id is not None:
+                raise ValidationError(
+                    f"leaderboard_type {leaderboard_type.name} ({int(leaderboard_type)}) does not "
+                    f"accept a def_id, got {def_id!r}"
+                )
+            return None
+
+        legal = ", ".join(repr(member.value) for member in def_id_enum)
+
+        if def_id is None:
+            raise ValidationError(
+                f"leaderboard_type {leaderboard_type.name} ({int(leaderboard_type)}) requires a "
+                f"def_id from {def_id_enum.__name__}; expected one of: {legal}"
+            )
+
+        raw = def_id.value if isinstance(def_id, Enum) else def_id
+        if not isinstance(raw, str):
+            raise ValidationError(f"def_id must be a {def_id_enum.__name__} member or its string value, got {def_id!r}")
+
+        try:
+            return str(def_id_enum(raw).value)
+        except ValueError:
+            raise ValidationError(
+                f"invalid def_id {def_id!r} for leaderboard_type {leaderboard_type.name} "
+                f"({int(leaderboard_type)}); expected one of: {legal}"
+            ) from None
 
     @staticmethod
     def _build_guild_leaderboard_payload(
-        leaderboard_type: LeaderboardType | int, count: int, def_id: str | None
+        leaderboard_type: LeaderboardType | int, count: int, def_id: DefId | str | None
     ) -> dict[str, Any]:
         """Validate arguments and build the payload for the GUILDLEADERBOARD endpoint."""
-        leaderboard_type = LeaderboardType(leaderboard_type)
+        try:
+            leaderboard_type = LeaderboardType(leaderboard_type)
+        except ValueError:
+            legal_types = ", ".join(f"{member.name} ({int(member)})" for member in LeaderboardType)
+            raise ValidationError(
+                f"invalid leaderboard_type {leaderboard_type!r}; expected one of: {legal_types}"
+            ) from None
         if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 200:
-            raise ValueError(f"count must be an integer between 1 and 200, got {count!r}")
+            raise ValidationError(f"count must be an integer between 1 and 200, got {count!r}")
         inner: dict[str, Any] = {"leaderboardType": int(leaderboard_type), "count": count}
-        if def_id is not None:
-            if not isinstance(def_id, str) or not def_id:
-                raise ValueError("def_id must be a non-empty string")
-            inner["defId"] = def_id
+        resolved_def_id = API._resolve_def_id(leaderboard_type, def_id)
+        if resolved_def_id is not None:
+            inner["defId"] = resolved_def_id
         return {"payload": inner}
 
     # Async methods
@@ -359,7 +446,9 @@ class API(MBot):
             method: HTTP method as a string, defaults to POST
             hmac: Boolean flag indicating whether the endpoints requires HMAC signature authentication
             payload: Dictionary of payload data to be sent with the request, defaults to empty dict.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            enums: How enum fields come back in the response. ``True`` returns them as string
+                   **names** (e.g. ``"UNITSTATTYPE_HEALTH"``); ``False`` (the default) returns
+                   them as integer **values** (e.g. ``1``).
             user_discord_id: Discord ID of the user the request is made on behalf of. Requires an
                              application approved to act as other users; forces HMAC signing.
 
@@ -491,10 +580,13 @@ class API(MBot):
 
         Keyword Args
             player_id: Player ID as a string, mutually exclusive with allycode.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data_async`, which defines the accepted
+                      set (``method``, ``hmac``, ``enums``, ``user_discord_id``). Unknown keywords
+                      raise ``TypeError`` there.
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
-        enums = kwargs.setdefault("enums", False)
-        player = await self.fetch_data_async(endpoint=EndPoint.PLAYER, payload={"payload": identity}, enums=enums)
+        kwargs.setdefault("enums", False)
+        player = await self.fetch_data_async(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
 
         if isinstance(player, dict) and "events" in player:
             return player["events"]
@@ -504,11 +596,16 @@ class API(MBot):
         """Return data from the GUILD endpoint for the provided guild
 
         Non-authenticated endpoint: does not use the player's EA game session.
+
+        Keyword Args
+            **kwargs: Forwarded verbatim to :meth:`fetch_data_async`, which defines the accepted
+                      set (``method``, ``hmac``, ``enums``, ``user_discord_id``). Unknown keywords
+                      raise ``TypeError`` there.
         """
         validated_guild_id = self._verify_guild_id(guild_id)
-        enums = kwargs.setdefault("enums", False)
+        kwargs.setdefault("enums", False)
         guild = await self.fetch_data_async(
-            endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, enums=enums
+            endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs
         )
 
         if isinstance(guild, dict) and "events" in guild and "guild" in guild["events"]:
@@ -556,8 +653,8 @@ class API(MBot):
         leaderboard_type: LeaderboardType | int,
         *,
         count: int = 50,
-        def_id: str | None = None,
-        enums: bool = False,
+        def_id: DefId | str | None = None,
+        **kwargs,
     ) -> dict[Any, Any]:
         """Return data from the GUILDLEADERBOARD endpoint
 
@@ -568,15 +665,27 @@ class API(MBot):
 
         Keyword Args
             count: Number of leaderboard entries to return, between 1 and 200. Default: 50
-            def_id: Leaderboard definition ID (e.g. ``GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF01``).
-                    Required by the API for raid-based leaderboard types.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            def_id: Leaderboard definition ID, as an enum member or its raw string value. Each
+                    leaderboard type is coupled to its own enum of legal values:
+                    type 4 (GUILD_TERRITORY_BATTLE_STARS) requires a ``TerritoryBattleDefId``,
+                    type 5 (GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER) a ``TerritoryWarDefId``,
+                    type 6 (GUILD_RAID_HIGH_WATERMARK) a ``GuildRaidDefId``
+                    (e.g. ``GuildRaidDefId.RANCOR_DIFF01``). Types 0, 1 and 3 accept no def_id.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data_async`, which defines the accepted
+                      set (``method``, ``hmac``, ``enums``, ``user_discord_id``). ``enums``
+                      defaults to False; unknown keywords raise ``TypeError`` there.
+
+        Raises
+            ValidationError: if leaderboard_type is not a legal type, count is out of bounds,
+                        or def_id is missing, unexpected, or not a legal value for the given
+                        leaderboard type.
         """
         payload = self._build_guild_leaderboard_payload(leaderboard_type, count, def_id)
-        return await self.fetch_data_async(EndPoint.GUILDLEADERBOARD, payload=payload, enums=enums)
+        kwargs.setdefault("enums", False)
+        return await self.fetch_data_async(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs)
 
     async def fetch_player_arena_async(
-        self, allycode: str | None = None, *, player_id: str | None = None, enums: bool = False
+        self, allycode: str | None = None, *, player_id: str | None = None, **kwargs
     ) -> dict[Any, Any]:
         """Return data from the PLAYERARENA endpoint for the provided allycode or player ID
 
@@ -588,7 +697,10 @@ class API(MBot):
 
         Keyword Args
             player_id: Player ID as a string, mutually exclusive with allycode.
-            enums: Boolean flag indicating whether to return enum values instead of enum names.
+            **kwargs: Forwarded verbatim to :meth:`fetch_data_async`, which defines the accepted
+                      set (``method``, ``hmac``, ``enums``, ``user_discord_id``). ``enums``
+                      defaults to False; unknown keywords raise ``TypeError`` there.
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
-        return await self.fetch_data_async(EndPoint.PLAYERARENA, payload={"payload": identity}, enums=enums)
+        kwargs.setdefault("enums", False)
+        return await self.fetch_data_async(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs)
