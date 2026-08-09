@@ -57,9 +57,7 @@ jobs:
         run: uv sync
 
       - name: Run ty
-        # Allowed to fail until the codebase is fully typed. Remove `|| true`
-        # once existing type errors are resolved.
-        run: uvx ty check mhanndalorian_bot/ || true
+        run: uvx ty check mhanndalorian_bot/
 
   # ── Test ───────────────────────────────────────────────────────────────
   test:

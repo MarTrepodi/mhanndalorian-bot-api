@@ -102,8 +102,6 @@ class Headers(dict):
         if key in self:
             del self[key]
 
-    pop = delete_header
-
 
 class Payload(dict):
 

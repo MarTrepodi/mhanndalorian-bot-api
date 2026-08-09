@@ -73,7 +73,8 @@ class MBot:
         if discord_id:
             self.set_discord_id(discord_id)
 
-        self.debug = debug
+        if debug is not None:
+            self.debug = debug
 
         if isinstance(api_host, str):
             self.set_api_host(api_host)
@@ -303,4 +304,6 @@ class MBot:
         self.client.headers = self.headers
         self.aclient.headers = self.headers
         if debug_enabled:
-            self.logger.debug(f"HTTP client headers updated with HMAC signature: {_redact_headers(self.client.headers)}")
+            self.logger.debug(
+                f"HTTP client headers updated with HMAC signature: {_redact_headers(self.client.headers)}"
+            )
