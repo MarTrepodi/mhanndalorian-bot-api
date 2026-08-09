@@ -213,10 +213,20 @@ async def test_async_context_manager_closes_aclient():
 def test_set_verify_rebuilds_clients():
     bot = make_bot()
     old_client = bot.client
+    old_aclient = bot.aclient
     bot.set_verify(False)
     assert bot.client is not old_client
+    assert bot.aclient is not old_aclient
     assert bot.client.headers["api-key"] == "12345678abcdefgh"
-    assert str(bot.client.base_url).startswith("https://mhanndalorianbot.work")
+    # Assert scheme and host separately rather than str(base_url).startswith(...):
+    # a prefix check also passes for https://mhanndalorianbot.work.example.com,
+    # so it would not catch a rebuild that corrupted the host into something
+    # merely prefixed by the real one.
+    assert bot.client.base_url.scheme == "https"
+    assert bot.client.base_url.host == "mhanndalorianbot.work"
+    # set_verify rebuilds both clients; the async one needs the same guarantee.
+    assert bot.aclient.base_url.scheme == "https"
+    assert bot.aclient.base_url.host == "mhanndalorianbot.work"
 
 
 def test_api_key_descriptor_rejects_non_string():
