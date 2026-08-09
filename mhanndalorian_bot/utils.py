@@ -6,8 +6,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Iterable
 from functools import wraps
-from typing import Any, Iterable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
