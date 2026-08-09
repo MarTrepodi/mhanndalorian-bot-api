@@ -68,7 +68,10 @@ line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# Base rules (E, F) plus import sorting (I), flake8-bugbear (B), and
+# pyupgrade (UP). Rules are pinned explicitly so a new Ruff release that
+# changes the default rule set cannot silently alter CI results.
+select = ["E", "F", "I", "B", "UP"]
 
 [tool.ty.environment]
 python-version = "3.10"
