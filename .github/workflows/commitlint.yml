@@ -43,4 +43,41 @@ jobs:
           EOF
 
       - name: Validate commits
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -uo pipefail
+
+          # Lint only the commits this PR actually authors.
+          #
+          # `base..head` alone is wrong for PRs into a branch that trails the
+          # default branch. When `develop` is behind `main` and a feature branch
+          # merges `main` in, every one of main's commits is "new to develop" and
+          # gets re-linted here — failing the PR over messages that were reviewed
+          # and accepted on main long ago, and which nobody on this PR can fix
+          # without rewriting published history.
+          #
+          # Excluding commits already reachable from the default branch is not a
+          # weakening: those commits were linted by their own PR. Merge commits
+          # are skipped for the same reason commitlint ignores them by default.
+          git fetch --quiet --no-tags origin "$DEFAULT_BRANCH"
+
+          commits=$(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA" --not "origin/$DEFAULT_BRANCH")
+
+          if [ -z "$commits" ]; then
+            echo "No branch-authored commits to validate."
+            exit 0
+          fi
+
+          echo "Validating $(echo "$commits" | wc -l | tr -d ' ') branch-authored commit(s)."
+
+          status=0
+          for sha in $commits; do
+            echo "── $(git log -1 --format='%h %s' "$sha")"
+            if ! git log -1 --format=%B "$sha" | npx commitlint --verbose; then
+              status=1
+            fi
+          done
+          exit $status
