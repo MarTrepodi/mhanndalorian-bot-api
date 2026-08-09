@@ -2,7 +2,7 @@
 
 Mhanndalorian_Bot is a Python library for interacting with the SWGOH Mhanndalorian Bot authenticated API and Player Registry endpoints.
 
-See https://mhanndalorianbot.work/api.html for more details
+See <https://mhanndalorianbot.work/apidocs.html> for the full API reference.
 
 ## Installation
 
@@ -16,7 +16,7 @@ Use the Python package manager [pip](https://pip.pypa.io/en/stable/) to install 
 
 ## Usage
 
-Before accessing the Mhanndalorian Bot APIs you must first register for an `apikey`. Instructions for generating an `apikey` can be found [here](https://mhanndalorianbot.work/api.html#api-setup).
+Before accessing the Mhanndalorian Bot APIs you must first register for an `apikey`. Instructions for generating an `apikey` can be found in the [API reference](https://mhanndalorianbot.work/apidocs.html).
 
 ### Basic Usage
 
@@ -60,30 +60,92 @@ Programmatically, check `EndPoint.TW.is_authenticated`.
 
 ### Error handling
 
-Non-200 responses raise typed exceptions carrying `status_code`, `endpoint`, and
-`response_text` attributes. All subclass `MBotError`, which subclasses `RuntimeError`:
+Everything the library raises subclasses `MBotError`, which subclasses `RuntimeError`. Below it
+the hierarchy splits in two, and the split matters when you write handlers:
+
+```
+RuntimeError
+└── MBotError                    every error the library raises
+    ├── ValidationError          your input was rejected locally, before any request was sent
+    └── APIResponseError         non-200 response  (.status_code, .endpoint, .response_text)
+        ├── BadRequestError      400
+        ├── AuthenticationError  401 - bad API key or HMAC signature
+        └── AuthorizationError   403 - not authorised for this account or endpoint
+```
+
+**Only `APIResponseError` and its subclasses carry `status_code` / `endpoint` /
+`response_text`.** A `ValidationError` describes a request that never left the client, so it has
+no response to report. Catch `APIResponseError` — not `MBotError` — when you intend to read those
+attributes:
 
 ```python
-from mhanndalorian_bot import API, AuthenticationError, MBotError
+from mhanndalorian_bot import API, APIResponseError, AuthenticationError, ValidationError
 
 mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
 
 try:
-    data = mbot.fetch_inventory()
-except AuthenticationError:      # HTTP 401 - bad API key or HMAC signature
+    data = mbot.fetch_player(allycode=<PLAYER ALLYCODE>)
+except ValidationError as exc:      # bad allycode, count out of range, defId/type mismatch...
+    print(f"bad input: {exc}")
+except AuthenticationError:         # HTTP 401
     ...
-except MBotError as exc:         # any other API error (400, 403, 5xx, ...)
-    print(exc.status_code, exc.endpoint)
+except APIResponseError as exc:     # any other non-200 (400, 403, 5xx, ...)
+    print(exc.status_code, exc.endpoint, exc.response_text)
 ```
+
+`except MBotError:` is still the right catch-all when you only need "something went wrong" and
+won't touch response attributes.
+
+#### Upgrading from 0.10.x
+
+`ValidationError` does **not** subclass `ValueError` or `TypeError`. Handlers that previously
+caught those around library calls silently stop catching:
+
+```python
+# before 0.11.0
+try:
+    mbot.fetch_player("123-456-789")
+except ValueError:
+    ...
+
+# 0.11.0 onwards
+try:
+    mbot.fetch_player("123-456-789")
+except ValidationError:
+    ...
+```
+
+`except RuntimeError:` and `except MBotError:` keep working throughout. A `TypeError` raised by
+Python itself against a method signature — an unknown keyword, a missing positional — is a
+programming error rather than bad input, and is deliberately still a plain `TypeError`.
+
+Note also that `fetch_player("123-456-789")` now sends `123456789`: per-call allycodes are
+cleansed the same way constructor allycodes always were, and one that isn't 9 digits raises
+instead of reaching the server.
 
 ### Guild leaderboards and player arena
 
+Three leaderboard types require a `def_id`, and each takes it from **its own** enum — the API
+constrains the *pairing*, not just the value, so `GuildRaidDefId` is only valid with
+`GUILD_RAID_HIGH_WATERMARK`:
+
+| `LeaderboardType` | `def_id` |
+|---|---|
+| `UNSPECIFIED`, `GUILD_RAID_ALL_COMP_PTS`, `GUILD_GALACTIC_POWER` | none — passing one is rejected |
+| `GUILD_TERRITORY_BATTLE_STARS` | `TerritoryBattleDefId` |
+| `GUILD_TERRITORY_WAR_OPPONENT_GALACTIC_POWER` | `TerritoryWarDefId` |
+| `GUILD_RAID_HIGH_WATERMARK` | `GuildRaidDefId` |
+
 ```python
-from mhanndalorian_bot import API, LeaderboardType
+from mhanndalorian_bot import API, GuildRaidDefId, LeaderboardType
 
 mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
 
 top_gp = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_GALACTIC_POWER, count=100)
+raid = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_RAID_HIGH_WATERMARK,
+                                    def_id=GuildRaidDefId.RANCOR_DIFF01)
+
+# raw strings work too, exactly like EndPoint
 raid = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_RAID_HIGH_WATERMARK,
                                     def_id="GUILD:RAIDS:NORMAL_DIFF:RANCOR:DIFF01")
 
@@ -91,9 +153,30 @@ raid = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_RAID_HIGH_WATERMARK,
 profile = mbot.fetch_player_arena(player_id=<PLAYER ID>)
 ```
 
+`count` must be 1–200. A missing, mismatched, or unexpected `def_id` raises `ValidationError`
+locally rather than sending a request the API would reject with a 400.
+
 `fetch_player` and `fetch_player_arena` accept either `allycode` or `player_id` (mutually
-exclusive). Applications approved to act on behalf of other users can pass
-`user_discord_id=<DISCORD ID>` to any fetch helper; this forces HMAC signing as the API requires.
+exclusive).
+
+Applications approved to act on behalf of other users can pass `user_discord_id=<DISCORD ID>` to
+any fetch helper; this forces HMAC signing as the API requires. One caveat worth knowing: the API
+spec declares `userDiscordId` for the authenticated endpoints and for `player` / `playerarena`,
+but **not** for `guild` / `guildleaderboard`. The library sends it wherever you pass it; whether
+the server honours it on those two endpoints is unverified.
+
+### The `enums` flag
+
+Every fetch helper accepts `enums` (default `False`), which selects how the API renders enum
+fields in the response:
+
+- `enums=False` → integer values
+- `enums=True` → string names
+
+```python
+mbot.fetch_inventory()              # enum fields come back as integers
+mbot.fetch_inventory(enums=True)    # ...as string names
+```
 
 ### Timeouts and retries
 

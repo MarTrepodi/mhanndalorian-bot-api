@@ -10,6 +10,33 @@ Public API:
                  BadRequestError (400), AuthenticationError (401), AuthorizationError (403),
                  ValidationError (local input rejected before a request was sent)
 
+When to use API vs Registry:
+    ``API`` reads SWGOH game data for a player or guild. ``Registry`` reads and writes the
+    SWGOH Player Registry, which maps Discord users to allycodes -- registration, portrait
+    and title verification, and lookup. They share a base class and a credential set, so a
+    consumer needing both constructs both.
+
+Session-breaking endpoints:
+    Thirteen endpoints authenticate as the registered player and **break that player's active
+    game session** -- ``tw``, ``twlogs``, ``twleaderboard``, ``tb``, ``tblogs``,
+    ``tbleaderboardhistory``, ``activeraid``, ``gac``, ``inventory``, ``leaderboard``,
+    ``squadpresets``, ``conquest``, ``events``. The other five (``player``, ``playerarena``,
+    ``guild``, ``guildleaderboard``, ``database``) do not. This matters for bots polling on a
+    timer: each poll of an authenticated endpoint ejects the player from the game. Check with
+    ``EndPoint.<MEMBER>.is_authenticated``.
+
+Recommended lifecycle:
+    ``API`` and ``Registry`` hold open httpx clients. Short scripts can let process exit
+    reclaim them, but long-running services should use the context manager::
+
+        with API(api_key=..., allycode=...) as api:
+            data = api.fetch_inventory()
+
+        async with API(api_key=..., allycode=...) as api:
+            data = await api.fetch_inventory_async()
+
+    ``close()`` / ``aclose()`` are available for callers managing lifecycle by hand.
+
 Breaking change in 0.11.0:
     Input validation raises ``ValidationError``, a sibling of ``APIResponseError`` under
     ``MBotError``. It does NOT subclass ``ValueError`` or ``TypeError``, so code written as
