@@ -237,7 +237,7 @@ DEF_ID_ENUM_BY_LEADERBOARD_TYPE: dict[LeaderboardType, type[Enum]] = {
 
 
 # Endpoints that authenticate as the registered player and use their EA session.
-# Calling them may interrupt an active in-game session for that player.
+# Calling them will break that player's active in-game session.
 AUTHENTICATED_ENDPOINTS: frozenset[str] = frozenset(
     {
         "activeraid",

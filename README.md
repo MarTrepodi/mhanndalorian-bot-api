@@ -52,7 +52,7 @@ mbot = API()  # reads MHANN_API_KEY and MHANN_ALLYCODE
 ### Authenticated vs non-authenticated endpoints
 
 The API distinguishes two endpoint groups. **Authenticated** endpoints log in as the registered
-player and may interrupt an active in-game session: `tw`, `twlogs`, `twleaderboard`, `tb`,
+player and **will break** that player's active in-game session: `tw`, `twlogs`, `twleaderboard`, `tb`,
 `tblogs`, `tbleaderboardhistory`, `activeraid`, `gac`, `inventory`, `leaderboard`,
 `squadpresets`, `conquest`, and `events`. **Non-authenticated** endpoints (`player`,
 `playerarena`, `guild`, `guildleaderboard`, `database`) do not touch the game session.
@@ -110,7 +110,7 @@ attributes:
 ```python
 from mhanndalorian_bot import API, APIResponseError, AuthenticationError, ValidationError
 
-mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
+mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOUR DISCORD USER ID>)
 
 try:
     data = mbot.fetch_player(allycode=<PLAYER ALLYCODE>)
@@ -193,7 +193,8 @@ constrains the *pairing*, not just the value, so `GuildRaidDefId` is only valid 
 ```python
 from mhanndalorian_bot import API, GuildRaidDefId, LeaderboardType
 
-mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>)
+# guildleaderboard and playerarena are non-authenticated endpoints, so a Discord ID is required.
+mbot = API(api_key=<YOUR APIKEY>, allycode=<YOUR ALLYCODE>, discord_id=<YOUR DISCORD USER ID>)
 
 top_gp = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_GALACTIC_POWER, count=100)
 raid = mbot.fetch_guild_leaderboard(LeaderboardType.GUILD_RAID_HIGH_WATERMARK,

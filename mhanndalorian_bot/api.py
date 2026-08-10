@@ -49,7 +49,7 @@ def _player_identity_payload(allycode: str | None, player_id: str | None, defaul
 class API(MBot):
     """
     Container class for MBot module to facilitate interacting with Mhanndalorian Bot authenticated
-    endpoints for SWGOH. See https://mhanndalorianbot.work/api.html for more information.
+    endpoints for SWGOH. See https://mhanndalorianbot.work/apidocs.html for more information.
     """
 
     logger = logging.getLogger(__name__)
