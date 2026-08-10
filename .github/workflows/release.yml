@@ -122,3 +122,37 @@ jobs:
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publish a GitHub Release for the tag.
+      #
+      # The workflow has never done this: it pushed a tag and stopped, and a git tag is not a
+      # GitHub Release. v0.7.0-v0.10.0 have Releases because an earlier semantic-release setup
+      # made them; `upload_to_release = false` in pyproject.toml is inert, since this workflow
+      # never invokes semantic-release. v0.11.0's Release had to be created by hand.
+      #
+      # Notes come from the hand-written CHANGELOG section for this version rather than
+      # --generate-notes, which would list raw commit subjects and bury the breaking changes.
+      - name: Create the GitHub Release
+        run: |
+          VERSION=$(uvx hatch version)
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; leaving it as is."
+            exit 0
+          fi
+          # Slice this version's section out of CHANGELOG.md: from its heading to the next one.
+          # Literal string match, not a regex: awk -v processes escapes, so a bracketed
+          # pattern like "## \[v1.2.3\]" arrives as "## [v1.2.3]" and is read as a
+          # character class, matching nothing.
+          awk -v head="## [v$VERSION]" '
+            index($0, head) == 1 {found=1; next}
+            found && index($0, "## [") == 1 {exit}
+            found {print}
+          ' CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "No CHANGELOG section for v$VERSION; falling back to generated notes."
+            gh release create "v$VERSION" --title "v$VERSION" --generate-notes
+          else
+            gh release create "v$VERSION" --title "v$VERSION" --notes-file release_notes.md
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
