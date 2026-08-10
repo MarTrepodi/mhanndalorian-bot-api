@@ -126,3 +126,28 @@ def test_all_comlink_payloads_carry_the_enums_flag(httpx_mock: HTTPXMock, regist
     registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789")
     for req in httpx_mock.get_requests():
         assert json.loads(req.content)["enums"] is False
+
+
+# --- x-discord-id enforcement on /database ------------------------------------------------------
+# Registry does NOT require a discord_id at construction, and its methods bypass fetch_data, so the
+# guard has to be applied on its own paths rather than inherited.
+
+
+def test_registry_fetch_player_requires_a_discord_id():
+    bare = Registry(api_key="test_api_key", allycode="123456789")
+    with pytest.raises(ValidationError, match="requires a Discord ID"):
+        bare.fetch_player(allycode="987654321")
+
+
+async def test_registry_fetch_player_async_requires_a_discord_id():
+    bare = Registry(api_key="test_api_key", allycode="123456789")
+    with pytest.raises(ValidationError, match="requires a Discord ID"):
+        await bare.fetch_player_async(allycode="987654321")
+
+
+def test_registry_comlink_paths_are_not_gated(httpx_mock: HTTPXMock):
+    """/comlink is absent from the spec and carries its Discord ID in the payload, so the
+    header rule does not apply to it."""
+    bare = Registry(api_key="test_api_key", allycode="123456789")
+    httpx_mock.add_response(json={"verified": False}, status_code=200)
+    bare.register_player(discord_id="123456789012345678", allycode="123456789")  # must not raise

@@ -13,3 +13,4 @@ docs/
 *.pem
 *.key
 secrets/
+setenv.sh

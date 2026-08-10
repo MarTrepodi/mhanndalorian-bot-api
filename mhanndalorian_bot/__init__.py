@@ -52,6 +52,10 @@ Breaking changes in 0.11.0:
        -- but note the old rule rejected every account created since ~July 2022 (19 digits),
        making Registry unusable for those users.
 
+    5. The five non-authenticated endpoints raise ``ValidationError`` when no Discord ID is set.
+       Only the *exception type* changes for affected callers -- the API already rejected those
+       requests with a 400, so no working code breaks.
+
     Calls to the 13 authenticated endpoints now emit ``SessionBreakWarning``, once per endpoint
     per process. Not breaking, but visible; silence with ``warnings.filterwarnings``.
 

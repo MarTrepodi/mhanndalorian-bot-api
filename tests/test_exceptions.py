@@ -25,7 +25,7 @@ STATUS_TO_EXC = [
 
 @pytest.fixture
 def api_instance():
-    return API(api_key="test_api_key", allycode="123456789")
+    return API(api_key="test_api_key", allycode="123456789", discord_id="123456789012345678")
 
 
 @pytest.fixture

@@ -9,6 +9,7 @@ from mhanndalorian_bot.api import API
 from mhanndalorian_bot.attrs import (
     AUTHENTICATED_ENDPOINTS,
     DEF_ID_ENUM_BY_LEADERBOARD_TYPE,
+    NON_AUTHENTICATED_ENDPOINTS,
     EndPoint,
     GuildRaidDefId,
     LeaderboardType,
@@ -17,7 +18,10 @@ from mhanndalorian_bot.attrs import (
 )
 from mhanndalorian_bot.exceptions import SessionBreakWarning, ValidationError
 
-api_instance = API("mock_api_key", "123456789")
+# A Discord ID is required for the five non-authenticated endpoints (spec v1.0.1; the server
+# returns 400 without it), so the shared instance carries one. Tests that need its absence build
+# their own instance.
+api_instance = API("mock_api_key", "123456789", "123456789012345678")
 
 # (helper name, expected URL path) for every named endpoint helper taking only **kwargs
 SIMPLE_HELPERS = [
@@ -468,7 +472,7 @@ async def test_per_call_dashed_allycode_is_normalised_async(httpx_mock: HTTPXMoc
 
 def test_both_doors_send_the_same_allycode(httpx_mock: HTTPXMock):
     """Same value, same fate: the constructor door and the per-call door converge on one payload."""
-    constructor_client = API("mock_api_key", DASHED_ALLYCODE)
+    constructor_client = API("mock_api_key", DASHED_ALLYCODE, "123456789012345678")
     httpx_mock.add_response(json={"events": {}}, status_code=200)
     httpx_mock.add_response(json={"events": {}}, status_code=200)
 
@@ -610,3 +614,53 @@ def test_warning_names_every_authenticated_endpoint_and_no_others():
         for rec in caught:
             warned.add(str(rec.message).split("'")[1])
     assert warned == set(AUTHENTICATED_ENDPOINTS)
+
+
+# --- x-discord-id enforcement -------------------------------------------------------------------
+# Spec v1.0.1 requires the header on all five Non-authenticated endpoints, and the live API agrees:
+# /player and /guild were both observed returning 400 without it and 200 with it.
+
+NO_DISCORD_ID_CALLS = [
+    ("fetch_player", lambda a: a.fetch_player("987654321")),
+    ("fetch_player_arena", lambda a: a.fetch_player_arena("987654321")),
+    ("fetch_guild", lambda a: a.fetch_guild("GID")),
+    ("fetch_guild_leaderboard", lambda a: a.fetch_guild_leaderboard(LeaderboardType.GUILD_GALACTIC_POWER)),
+    ("fetch_data", lambda a: a.fetch_data(EndPoint.PLAYER)),
+]
+
+
+@pytest.mark.parametrize("name,call", NO_DISCORD_ID_CALLS, ids=[n for n, _ in NO_DISCORD_ID_CALLS])
+def test_non_authenticated_helpers_require_a_discord_id(name, call):
+    """Fails locally instead of spending a round-trip on a guaranteed 400."""
+    bare = API("mock_api_key", "123456789")  # deliberately no discord_id
+    with pytest.raises(ValidationError, match="requires a Discord ID"):
+        call(bare)
+
+
+def test_authenticated_endpoints_are_not_gated(httpx_mock: HTTPXMock):
+    """The rule applies only to the five Non-authenticated endpoints."""
+    bare = API("mock_api_key", "123456789")
+    httpx_mock.add_response(json={"code": 0}, status_code=200)
+    bare.fetch_inventory()  # must not raise
+
+
+def test_undocumented_slugs_are_not_gated(httpx_mock: HTTPXMock):
+    """Gating on 'not authenticated' would sweep in custom slugs; the rule uses an explicit set."""
+    bare = API("mock_api_key", "123456789")
+    httpx_mock.add_response(json={"code": 0}, status_code=200)
+    bare.fetch_data("some-undocumented-endpoint")  # must not raise
+
+
+def test_enforcement_set_matches_the_spec():
+    """Pinned against the spec's Non-authenticated tag, minus /comlink which the spec omits."""
+    assert NON_AUTHENTICATED_ENDPOINTS == {"database", "guild", "guildleaderboard", "player", "playerarena"}
+    assert not (NON_AUTHENTICATED_ENDPOINTS & AUTHENTICATED_ENDPOINTS)
+
+
+def test_discord_id_set_after_construction_satisfies_the_rule(httpx_mock: HTTPXMock):
+    bare = API("mock_api_key", "123456789")
+    with pytest.raises(ValidationError):
+        bare.fetch_player("987654321")
+    bare.set_discord_id("123456789012345678")
+    httpx_mock.add_response(json={"code": 0, "events": {}}, status_code=200)
+    bare.fetch_player("987654321")  # must not raise

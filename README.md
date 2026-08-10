@@ -68,6 +68,25 @@ from mhanndalorian_bot import SessionBreakWarning
 warnings.filterwarnings("ignore", category=SessionBreakWarning)
 ```
 
+### Discord ID is required for non-authenticated endpoints
+
+The API rejects the five **Non-authenticated** endpoints — `player`, `playerarena`, `guild`,
+`guildleaderboard`, `database` — with a **400** when the `x-discord-id` header is absent. The
+library checks locally and raises `ValidationError` rather than spending a round-trip on a request
+the server will refuse:
+
+```python
+mbot = API(api_key=..., allycode=...)          # no discord_id
+mbot.fetch_player(allycode=...)                # ValidationError: 'player' requires a Discord ID
+
+mbot = API(api_key=..., allycode=..., discord_id=...)
+mbot.fetch_player(allycode=...)                # fine
+```
+
+Set it via the constructor, the `MHANN_DISCORD_ID` environment variable, or `set_discord_id()`.
+Authenticated endpoints are unaffected, and so is the registry's `/comlink` path, which carries its
+Discord ID in the payload instead. Check programmatically with `EndPoint.PLAYER.requires_discord_id`.
+
 ### Error handling
 
 Everything the library raises subclasses `MBotError`, which subclasses `RuntimeError`. Below it

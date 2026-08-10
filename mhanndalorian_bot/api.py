@@ -152,6 +152,7 @@ class API(MBot):
         """
 
         self._warn_if_session_breaking(endpoint)
+        self._require_discord_id(endpoint)
         endpoint = self._resolve_endpoint(endpoint)
         method = (method or "POST").upper()
         is_hmac_signed = hmac if hmac is not None else self.hmac
@@ -483,6 +484,7 @@ class API(MBot):
             Dictionary from JSON response.
         """
         self._warn_if_session_breaking(endpoint)
+        self._require_discord_id(endpoint)
         endpoint = self._resolve_endpoint(endpoint)
         method = (method or "POST").upper()
         is_hmac_signed = hmac if hmac is not None else self.hmac

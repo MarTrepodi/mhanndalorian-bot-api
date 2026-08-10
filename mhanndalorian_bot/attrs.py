@@ -13,6 +13,7 @@ __all__ = [
     "APIKey",
     "AllyCode",
     "AUTHENTICATED_ENDPOINTS",
+    "NON_AUTHENTICATED_ENDPOINTS",
     "DEF_ID_ENUM_BY_LEADERBOARD_TYPE",
     "Debug",
     "DefId",
@@ -152,8 +153,13 @@ class EndPoint(Enum):
         return [name for name, member in EndPoint.__members__.items()]
 
     @property
+    def requires_discord_id(self) -> bool:
+        """Whether this endpoint requires the ``x-discord-id`` header (spec v1.0.1)."""
+        return self.value in NON_AUTHENTICATED_ENDPOINTS
+
+    @property
     def is_authenticated(self) -> bool:
-        """True if this endpoint uses the registered player's EA session (may interrupt active game sessions)."""
+        """True if this endpoint uses the registered player's EA session and will break it."""
         return self.value in AUTHENTICATED_ENDPOINTS
 
 
@@ -248,4 +254,17 @@ AUTHENTICATED_ENDPOINTS: frozenset[str] = frozenset(
         "twleaderboard",
         "twlogs",
     }
+)
+
+
+# The five endpoints spec v1.0.1 tags "Non-authenticated". Every one of them requires the
+# `x-discord-id` header: /player and /guild were both observed returning 400 without it and 200
+# with it, and the spec states the rule for all five.
+#
+# Deliberately an explicit set rather than "any slug not in AUTHENTICATED_ENDPOINTS". `comlink` is
+# absent from the OpenAPI spec entirely and carries its Discord ID in the payload instead, and
+# callers may pass an undocumented slug straight to fetch_data -- neither should be gated by a rule
+# derived from an endpoint list they are not part of.
+NON_AUTHENTICATED_ENDPOINTS: frozenset[str] = frozenset(
+    {"database", "guild", "guildleaderboard", "player", "playerarena"}
 )
