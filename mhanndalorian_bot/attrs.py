@@ -15,13 +15,9 @@ __all__ = [
     "AUTHENTICATED_ENDPOINTS",
     "NON_AUTHENTICATED_ENDPOINTS",
     "DEF_ID_ENUM_BY_LEADERBOARD_TYPE",
-    "Debug",
     "DefId",
     "GuildRaidDefId",
-    "HMAC",
-    "Headers",
     "LeaderboardType",
-    "Payload",
     "EndPoint",
     "TerritoryBattleDefId",
     "TerritoryWarDefId",
@@ -70,7 +66,15 @@ class APIKey(ManagedAttribute):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
 
 
-class AllyCode(ManagedAttribute, str):
+class AllyCode(ManagedAttribute):
+    """Descriptor for the 9-digit player allycode.
+
+    Deliberately not a `str` subclass. It inherited `str` historically, which made the
+    *descriptor object* itself a string of value `""` -- `isinstance(MBot.__dict__["allycode"],
+    str)` was True -- while nothing ever used the string behaviour. The value it manages is a
+    `str`; the descriptor is not.
+    """
+
     def __init__(self, allycode=None):
         self.allycode = allycode
 
@@ -79,48 +83,6 @@ class AllyCode(ManagedAttribute, str):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
         if not value.isdigit() or len(value) != 9:
             raise ValidationError(f"Invalid allyCode ({value}): Value must be exactly 9 numerical characters.")
-
-
-class Debug(ManagedAttribute):
-    def __init__(self, debug: bool = False):
-        self.debug = debug
-
-    def validate(self, value: Any) -> None:
-        if not isinstance(value, bool):
-            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
-
-
-class HMAC(ManagedAttribute):
-    def __init__(self, hmac: bool = True):
-        self.hmac = hmac
-
-    def validate(self, value: Any) -> None:
-        if not isinstance(value, bool):
-            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
-
-
-class Headers(dict):
-    def __getitem__(self, key):
-        return super().get(key, None)
-
-    def add_header(self, key: str, value: Any):
-        """Add a header and append value if already exists"""
-        if key in self:
-            self[key] += f",{value}"
-        else:
-            self[key] = value
-
-    push = add_header
-
-    def delete_header(self, key: str):
-        """Delete header if exists"""
-        if key in self:
-            del self[key]
-
-
-class Payload(dict):
-    def __getitem__(self, key):
-        return super().get(key, None)
 
 
 class EndPoint(Enum):
