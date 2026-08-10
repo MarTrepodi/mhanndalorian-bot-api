@@ -10,7 +10,7 @@ import logging
 import os
 import time
 from json import dumps
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 from sentinels import Sentinel
@@ -20,6 +20,12 @@ from mhanndalorian_bot.exceptions import ValidationError
 from mhanndalorian_bot.utils import func_debug_logger, func_timer, redact_secret
 
 NotSet = Sentinel("NotSet")
+
+# `__enter__` used to be annotated `-> MBot`, so `with API(...) as api:` handed back the base
+# class and every fetch_* method became unresolvable -- in exactly the form the README and all
+# four examples recommend. A TypeVar bound to MBot preserves the subclass without needing
+# `typing.Self` (3.11+) or a typing_extensions dependency at the 3.10 floor.
+_MBotT = TypeVar("_MBotT", bound="MBot")
 
 _REDACTED = "[REDACTED]"
 _SENSITIVE_HEADER_KEYS = frozenset({"api-key", "authorization", "x-discord-id"})
@@ -170,13 +176,13 @@ class MBot:
             self.client = httpx.Client(**client_kwargs)
             self.aclient = httpx.AsyncClient(**client_kwargs)
 
-    def __enter__(self) -> MBot:
+    def __enter__(self: _MBotT) -> _MBotT:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    async def __aenter__(self) -> MBot:
+    async def __aenter__(self: _MBotT) -> _MBotT:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

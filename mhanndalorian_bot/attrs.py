@@ -5,7 +5,7 @@ Attribute definitions
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, IntEnum
-from typing import Any
+from typing import Any, overload
 
 from mhanndalorian_bot.exceptions import ValidationError
 
@@ -15,13 +15,9 @@ __all__ = [
     "AUTHENTICATED_ENDPOINTS",
     "NON_AUTHENTICATED_ENDPOINTS",
     "DEF_ID_ENUM_BY_LEADERBOARD_TYPE",
-    "Debug",
     "DefId",
     "GuildRaidDefId",
-    "HMAC",
-    "Headers",
     "LeaderboardType",
-    "Payload",
     "EndPoint",
     "TerritoryBattleDefId",
     "TerritoryWarDefId",
@@ -31,19 +27,33 @@ logger = logging.getLogger(__name__)
 
 
 class ManagedAttribute(ABC):
-    def __set_name__(self, owner, name):
+    def __set_name__(self, owner: type[Any], name: str) -> None:
         self.private_name = "_" + name
 
-    def __get__(self, obj, objtype=None):
+    @overload
+    def __get__(self, obj: None, objtype: type[Any] | None = None) -> "ManagedAttribute": ...
+
+    @overload
+    def __get__(self, obj: object, objtype: type[Any] | None = None) -> str: ...
+
+    def __get__(self, obj: object | None, objtype: type[Any] | None = None) -> "ManagedAttribute | str":
+        """Typed so `api.api_key` resolves to `str` rather than `Unknown`.
+
+        Two overloads because class access and instance access return different things:
+        `API.api_key` is the descriptor itself, `api.api_key` is the stored value. Without
+        annotations a type checker gives up on both and an IDE offers nothing.
+        """
+        if obj is None:
+            return self
         return getattr(obj, self.private_name)
 
-    def __set__(self, obj, value):
+    def __set__(self, obj: object, value: Any) -> None:
         self.validate(value)
         logger.debug(f"Setting {self.private_name!r} to {value!r} for object {obj!r}")
         setattr(obj, self.private_name, value)
 
     @abstractmethod
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         pass
 
 
@@ -51,62 +61,28 @@ class APIKey(ManagedAttribute):
     def __init__(self, api_key=None):
         self.api_key = api_key
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, str):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
 
 
-class AllyCode(ManagedAttribute, str):
+class AllyCode(ManagedAttribute):
+    """Descriptor for the 9-digit player allycode.
+
+    Deliberately not a `str` subclass. It inherited `str` historically, which made the
+    *descriptor object* itself a string of value `""` -- `isinstance(MBot.__dict__["allycode"],
+    str)` was True -- while nothing ever used the string behaviour. The value it manages is a
+    `str`; the descriptor is not.
+    """
+
     def __init__(self, allycode=None):
         self.allycode = allycode
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, str):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
         if not value.isdigit() or len(value) != 9:
             raise ValidationError(f"Invalid allyCode ({value}): Value must be exactly 9 numerical characters.")
-
-
-class Debug(ManagedAttribute):
-    def __init__(self, debug: bool = False):
-        self.debug = debug
-
-    def validate(self, value):
-        if not isinstance(value, bool):
-            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
-
-
-class HMAC(ManagedAttribute):
-    def __init__(self, hmac: bool = True):
-        self.hmac = hmac
-
-    def validate(self, value):
-        if not isinstance(value, bool):
-            raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
-
-
-class Headers(dict):
-    def __getitem__(self, key):
-        return super().get(key, None)
-
-    def add_header(self, key: str, value: Any):
-        """Add a header and append value if already exists"""
-        if key in self:
-            self[key] += f",{value}"
-        else:
-            self[key] = value
-
-    push = add_header
-
-    def delete_header(self, key: str):
-        """Delete header if exists"""
-        if key in self:
-            del self[key]
-
-
-class Payload(dict):
-    def __getitem__(self, key):
-        return super().get(key, None)
 
 
 class EndPoint(Enum):

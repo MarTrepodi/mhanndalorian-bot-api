@@ -213,3 +213,42 @@ async def test_stacked_decorators_on_coroutine_still_time_awaited_work(caplog):
 
     seconds = _timed_seconds(caplog, "slow")
     assert seconds >= SLEEP * 0.75, f"recorded {seconds}s, expected at least the {SLEEP}s sleep"
+
+
+# --- decorator type preservation ----------------------------------------------------------------
+# func_timer and func_debug_logger were unannotated, which erased the signature of all 17 public
+# methods they decorate: a type checker reported them as `Unknown`, so an IDE offered no
+# parameters, no return type and no completion. These pin the properties that fix relies on.
+
+
+def test_func_timer_preserves_the_wrapped_signature():
+    import inspect
+
+    def sample(a: int, b: str = "x") -> float:
+        return 1.0
+
+    assert inspect.signature(func_timer(sample)) == inspect.signature(sample)
+
+
+def test_func_debug_logger_preserves_the_wrapped_signature():
+    import inspect
+
+    def sample(a: int, *, b: str = "x") -> float:
+        return 1.0
+
+    assert inspect.signature(func_debug_logger(sample)) == inspect.signature(sample)
+
+
+def test_decorators_survive_a_callable_without_a_dunder_name():
+    """Callable[P, R] carries no __name__; a partial or callable instance must not crash logging."""
+    import functools
+    import logging
+
+    def sample(a: int) -> int:
+        return a
+
+    partial = functools.partial(sample)
+    assert not hasattr(partial, "__name__")
+    logging.getLogger("mhanndalorian_bot.utils").setLevel(logging.DEBUG)
+    assert func_timer(partial)(3) == 3
+    assert func_debug_logger(partial)(4) == 4

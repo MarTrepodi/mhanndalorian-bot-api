@@ -12,7 +12,7 @@ from typing import Any
 
 from mhanndalorian_bot.attrs import AUTHENTICATED_ENDPOINTS, DefId, EndPoint, LeaderboardType
 from mhanndalorian_bot.base import MBot
-from mhanndalorian_bot.exceptions import SessionBreakWarning, ValidationError, raise_for_response
+from mhanndalorian_bot.exceptions import APIResponseError, SessionBreakWarning, ValidationError, raise_for_response
 from mhanndalorian_bot.utils import func_timer
 
 
@@ -87,6 +87,20 @@ class API(MBot):
             SessionBreakWarning,
             stacklevel=2,
         )
+
+    def _as_mapping(self, result: dict[Any, Any] | list[Any], endpoint: EndPoint | str) -> dict[Any, Any]:
+        """Narrow a fetch_data result to a JSON object.
+
+        Every endpoint except /database returns an object. `fetch_data` is honest that a list is
+        possible, but forcing all 34 named helpers to advertise `dict | list` would make callers
+        narrow a union that can never occur for them. This asserts the shape once, so the helpers
+        can promise `dict` truthfully -- and a server that starts returning something else fails
+        here with a clear message rather than as a KeyError somewhere downstream.
+        """
+        if isinstance(result, dict):
+            return result
+        slug = endpoint.value if isinstance(endpoint, EndPoint) else endpoint
+        raise APIResponseError(f"expected a JSON object from '{slug}', got {type(result).__name__}")
 
     @staticmethod
     def _verify_allycode(allycode: str) -> str:
@@ -192,7 +206,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TWLEADERBOARD, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TWLEADERBOARD, **kwargs), EndPoint.TWLEADERBOARD)
 
     def fetch_twlogs(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event
@@ -201,7 +215,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TWLOGS, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TWLOGS, **kwargs), EndPoint.TWLOGS)
 
     def fetch_tblogs(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event
@@ -210,7 +224,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TBLOGS, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TBLOGS, **kwargs), EndPoint.TBLOGS)
 
     def fetch_inventory(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player INVENTORY endpoint
@@ -219,7 +233,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.INVENTORY, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.INVENTORY, **kwargs), EndPoint.INVENTORY)
 
     def fetch_arena(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint
@@ -228,7 +242,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.ARENA, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.ARENA, **kwargs), EndPoint.ARENA)
 
     def fetch_tb(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event
@@ -237,7 +251,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TB, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TB, **kwargs), EndPoint.TB)
 
     def fetch_tb_history(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint
@@ -246,7 +260,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TBHISTORY, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TBHISTORY, **kwargs), EndPoint.TBHISTORY)
 
     def fetch_tw(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event
@@ -255,7 +269,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.TW, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.TW, **kwargs), EndPoint.TW)
 
     def fetch_raid(self, **kwargs) -> dict[Any, Any]:
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event
@@ -264,7 +278,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.RAID, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.RAID, **kwargs), EndPoint.RAID)
 
     def fetch_player(self, allycode: str | None = None, *, player_id: str | None = None, **kwargs) -> dict[Any, Any]:
         """Return data from the PLAYER endpoint for the provided allycode or player ID
@@ -282,7 +296,9 @@ class API(MBot):
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
         kwargs.setdefault("enums", False)
-        player = self.fetch_data(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
+        player = self._as_mapping(
+            self.fetch_data(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs), EndPoint.PLAYER
+        )
 
         return player
 
@@ -298,7 +314,10 @@ class API(MBot):
         """
         validated_guild_id = self._verify_guild_id(guild_id)
         kwargs.setdefault("enums", False)
-        guild = self.fetch_data(endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs)
+        guild = self._as_mapping(
+            self.fetch_data(endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs),
+            EndPoint.GUILD,
+        )
 
         return guild
 
@@ -309,7 +328,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.SQUADS, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.SQUADS, **kwargs), EndPoint.SQUADS)
 
     def fetch_gac(self, **kwargs) -> dict[Any, Any]:
         """Return data from the GAC endpoint
@@ -318,7 +337,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.GAC, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.GAC, **kwargs), EndPoint.GAC)
 
     def fetch_conquest(self, **kwargs) -> dict[Any, Any]:
         """Return data from the CONQUEST endpoint
@@ -327,7 +346,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.CONQUEST, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.CONQUEST, **kwargs), EndPoint.CONQUEST)
 
     def fetch_events(self, **kwargs) -> dict[Any, Any]:
         """Return data from the EVENTS endpoint listing current and upcoming game events
@@ -336,7 +355,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.EVENTS, **kwargs)
+        return self._as_mapping(self.fetch_data(EndPoint.EVENTS, **kwargs), EndPoint.EVENTS)
 
     def fetch_guild_leaderboard(
         self,
@@ -372,7 +391,9 @@ class API(MBot):
         """
         payload = self._build_guild_leaderboard_payload(leaderboard_type, count, def_id)
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs)
+        return self._as_mapping(
+            self.fetch_data(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs), EndPoint.GUILDLEADERBOARD
+        )
 
     def fetch_player_arena(
         self, allycode: str | None = None, *, player_id: str | None = None, **kwargs
@@ -393,7 +414,9 @@ class API(MBot):
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
         kwargs.setdefault("enums", False)
-        return self.fetch_data(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs)
+        return self._as_mapping(
+            self.fetch_data(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs), EndPoint.PLAYERARENA
+        )
 
     @staticmethod
     def _resolve_def_id(leaderboard_type: LeaderboardType, def_id: DefId | str | None) -> str | None:
@@ -524,7 +547,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TWLEADERBOARD, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TWLEADERBOARD, **kwargs), EndPoint.TWLEADERBOARD)
 
     async def fetch_twlogs_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TWLOGS endpoint for the currently active Territory War guild event
@@ -533,7 +556,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TWLOGS, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TWLOGS, **kwargs), EndPoint.TWLOGS)
 
     async def fetch_tblogs_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLOGS endpoint for the currently active Territory Battle guild event
@@ -542,7 +565,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TBLOGS, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TBLOGS, **kwargs), EndPoint.TBLOGS)
 
     async def fetch_inventory_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player INVENTORY endpoint
@@ -551,7 +574,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.INVENTORY, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.INVENTORY, **kwargs), EndPoint.INVENTORY)
 
     async def fetch_arena_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the player squad and fleet arena endpoint
@@ -560,7 +583,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.ARENA, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.ARENA, **kwargs), EndPoint.ARENA)
 
     async def fetch_tb_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TB endpoint for the currently active Territory Battle guild event
@@ -569,7 +592,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TB, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TB, **kwargs), EndPoint.TB)
 
     async def fetch_tb_history_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TBLEADERBOARDHISTORY endpoint
@@ -578,7 +601,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TBHISTORY, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TBHISTORY, **kwargs), EndPoint.TBHISTORY)
 
     async def fetch_tw_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the TW endpoint for the currently active Territory War guild event
@@ -587,7 +610,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.TW, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.TW, **kwargs), EndPoint.TW)
 
     async def fetch_raid_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the ACTIVERAID endpoint for the currently active raid guild event
@@ -596,7 +619,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.RAID, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.RAID, **kwargs), EndPoint.RAID)
 
     async def fetch_player_async(
         self, allycode: str | None = None, *, player_id: str | None = None, **kwargs
@@ -616,7 +639,10 @@ class API(MBot):
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
         kwargs.setdefault("enums", False)
-        player = await self.fetch_data_async(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs)
+        player = self._as_mapping(
+            await self.fetch_data_async(endpoint=EndPoint.PLAYER, payload={"payload": identity}, **kwargs),
+            EndPoint.PLAYER,
+        )
 
         return player
 
@@ -632,8 +658,11 @@ class API(MBot):
         """
         validated_guild_id = self._verify_guild_id(guild_id)
         kwargs.setdefault("enums", False)
-        guild = await self.fetch_data_async(
-            endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs
+        guild = self._as_mapping(
+            await self.fetch_data_async(
+                endpoint=EndPoint.GUILD, payload={"payload": {"guildId": validated_guild_id}}, **kwargs
+            ),
+            EndPoint.GUILD,
         )
 
         return guild
@@ -645,7 +674,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.SQUADS, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.SQUADS, **kwargs), EndPoint.SQUADS)
 
     async def fetch_gac_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the GAC endpoint
@@ -654,7 +683,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.GAC, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.GAC, **kwargs), EndPoint.GAC)
 
     async def fetch_conquest_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the CONQUEST endpoint
@@ -663,7 +692,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.CONQUEST, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.CONQUEST, **kwargs), EndPoint.CONQUEST)
 
     async def fetch_events_async(self, **kwargs) -> dict[Any, Any]:
         """Return data from the EVENTS endpoint listing current and upcoming game events
@@ -672,7 +701,7 @@ class API(MBot):
         player's active game session. Emits a SessionBreakWarning.
         """
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.EVENTS, **kwargs)
+        return self._as_mapping(await self.fetch_data_async(EndPoint.EVENTS, **kwargs), EndPoint.EVENTS)
 
     async def fetch_guild_leaderboard_async(
         self,
@@ -708,7 +737,10 @@ class API(MBot):
         """
         payload = self._build_guild_leaderboard_payload(leaderboard_type, count, def_id)
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs)
+        return self._as_mapping(
+            await self.fetch_data_async(EndPoint.GUILDLEADERBOARD, payload=payload, **kwargs),
+            EndPoint.GUILDLEADERBOARD,
+        )
 
     async def fetch_player_arena_async(
         self, allycode: str | None = None, *, player_id: str | None = None, **kwargs
@@ -729,4 +761,7 @@ class API(MBot):
         """
         identity = _player_identity_payload(allycode, player_id, self.allycode)
         kwargs.setdefault("enums", False)
-        return await self.fetch_data_async(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs)
+        return self._as_mapping(
+            await self.fetch_data_async(EndPoint.PLAYERARENA, payload={"payload": identity}, **kwargs),
+            EndPoint.PLAYERARENA,
+        )

@@ -1,6 +1,6 @@
 """Tests for enums and attribute helpers in attrs.py."""
 
-from mhanndalorian_bot.attrs import AUTHENTICATED_ENDPOINTS, EndPoint, LeaderboardType
+from mhanndalorian_bot.attrs import AUTHENTICATED_ENDPOINTS, AllyCode, EndPoint, LeaderboardType
 
 
 def test_endpoint_aliases():
@@ -72,3 +72,33 @@ def test_endpoint_is_authenticated_property():
     assert EndPoint.GUILDLEADERBOARD.is_authenticated is False
     assert EndPoint.PLAYERARENA.is_authenticated is False
     assert EndPoint.FETCH.is_authenticated is False
+
+
+# --- descriptor shape ---------------------------------------------------------------------------
+
+
+def test_allycode_descriptor_is_not_a_string():
+    """AllyCode inherited `str`, which made the descriptor object itself a string of value "".
+
+    Nothing used the string behaviour; it only confused the MRO and any type checker reading it.
+    The managed *value* is a str -- the descriptor is not.
+    """
+    from mhanndalorian_bot.base import MBot
+
+    descriptor = MBot.__dict__["allycode"]
+    assert isinstance(descriptor, AllyCode)
+    assert not isinstance(descriptor, str)
+    assert str not in type(descriptor).__mro__
+
+
+def test_dead_attribute_classes_are_gone():
+    """Headers, Payload, Debug and HMAC were never instantiated anywhere.
+
+    `self.headers` / `self.payload` are plain dicts and `MBot.debug` / `MBot.hmac` are plain
+    class attributes, so these four were unreachable code exported in __all__.
+    """
+    from mhanndalorian_bot import attrs
+
+    for name in ("Headers", "Payload", "Debug", "HMAC"):
+        assert not hasattr(attrs, name), f"{name} should have been removed"
+        assert name not in attrs.__all__

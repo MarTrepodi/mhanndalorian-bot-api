@@ -10,11 +10,31 @@ import sys
 import time
 from collections.abc import Callable, Iterable
 from functools import wraps
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
 
 from mhanndalorian_bot.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
+
+# ParamSpec/TypeVar rather than a bare unannotated `def func_timer(f):`, which erases the
+# signature of everything it wraps -- a type checker reports the decorated method as `Unknown`,
+# so an IDE offers no parameters, no return type and no completion. These two decorators sit on
+# 17 public methods, including fetch_data, sign and the entire Registry surface.
+#
+# `Callable[P, R] -> Callable[P, R]` covers the async case too: for a coroutine function R binds
+# to the Coroutine, so the awaited type survives without a separate overload.
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _callable_name(f: object) -> str:
+    """Best-effort name for a decorated callable.
+
+    `Callable[P, R]` carries no `__name__` -- functools.partial objects and callable instances
+    are callables without one -- so this is read defensively rather than assumed.
+    """
+    return getattr(f, "__name__", repr(f))
+
 
 _SENSITIVE_ARG_NAMES = frozenset({"api_key", "apikey", "discord_id", "allycode", "authorization", "token"})
 
@@ -83,7 +103,7 @@ def _mark_coroutine_function(wrapper: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def func_timer(f):
+def func_timer(f: Callable[_P, _R]) -> Callable[_P, _R]:
     """Decorator to record total execution time of a function to the configured logger using level DEBUG.
 
     Works on both plain functions and coroutine functions. For a coroutine function the
@@ -112,7 +132,7 @@ def func_timer(f):
             ts = time.perf_counter()
             result = await f(*args, **kw)
             te = time.perf_counter()
-            logger.debug(f"  [ {f.__name__}() ] took: {(te - ts):.6f} seconds")
+            logger.debug(f"  [ {_callable_name(f)}() ] took: {(te - ts):.6f} seconds")
             return result
 
         return _mark_coroutine_function(async_wrap)
@@ -124,13 +144,13 @@ def func_timer(f):
         ts = time.perf_counter()
         result = f(*args, **kw)
         te = time.perf_counter()
-        logger.debug(f"  [ {f.__name__}() ] took: {(te - ts):.6f} seconds")
+        logger.debug(f"  [ {_callable_name(f)}() ] took: {(te - ts):.6f} seconds")
         return result
 
     return wrap
 
 
-def func_debug_logger(f):
+def func_debug_logger(f: Callable[_P, _R]) -> Callable[_P, _R]:
     """Decorator for applying DEBUG logging to a function if enabled in the MBot class.
 
     Arguments matching known-sensitive names (api_key, discord_id, allycode, ...) are
@@ -152,7 +172,7 @@ def func_debug_logger(f):
         @wraps(f)
         async def async_wrap(*args, **kw):
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"  [ function {f.__name__}() ] called with {_format_redacted_call(f, args, kw)}")
+                logger.debug(f"  [ function {_callable_name(f)}() ] called with {_format_redacted_call(f, args, kw)}")
             return await f(*args, **kw)
 
         return _mark_coroutine_function(async_wrap)
@@ -160,7 +180,7 @@ def func_debug_logger(f):
     @wraps(f)
     def wrap(*args, **kw):
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"  [ function {f.__name__}() ] called with {_format_redacted_call(f, args, kw)}")
+            logger.debug(f"  [ function {_callable_name(f)}() ] called with {_format_redacted_call(f, args, kw)}")
         return f(*args, **kw)
 
     return wrap
