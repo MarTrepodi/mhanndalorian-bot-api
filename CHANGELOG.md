@@ -1,6 +1,6 @@
 <!-- insertion marker -->
 
-## [v0.11.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.11.0) - 2026-07-12
+## [v0.11.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/releases/tag/v0.11.0) - 2026-08-10
 
 <small>[Compare with v0.10.0](https://github.com/MarTrepodi/mhanndalorian-bot-api/compare/v0.10.0...v0.11.0)</small>
 
@@ -21,6 +21,32 @@
 - **errors**: non-200 responses raise typed exceptions (`BadRequestError` 400,
   `AuthenticationError` 401, `AuthorizationError` 403, `APIResponseError` otherwise). All
   subclass `MBotError(RuntimeError)`, so existing `except RuntimeError` handlers keep working.
+- **errors**: input validation raises **`ValidationError`**, a sibling of `APIResponseError`
+  under `MBotError`. It does **not** subclass `ValueError` or `TypeError`, so
+  `except ValueError:` / `except TypeError:` around library calls silently stops catching.
+  29 raise sites moved. Affects constructors, `cleanse_allycode` / `cleanse_discord_id`,
+  `set_api_key` / `set_api_host`, `fetch_player` / `fetch_player_arena` / `fetch_guild` /
+  `fetch_guild_leaderboard`, `human_time`, `calc_tw_score_total`, `get_tw_opponent_url`, and
+  direct descriptor assignment (which moved from `AttributeError`). `except RuntimeError:` and
+  `except MBotError:` keep working. A `TypeError` raised by Python itself against a method
+  signature is a programming error, not bad input, and stays a plain `TypeError`.
+- **api**: `fetch_player` and `fetch_guild` (+ async twins) **no longer strip the response
+  envelope**. They were the only two helpers that ever did. Reach through `["events"]`, and
+  `["events"]["guild"]` for guild. The envelope is not uniform across endpoints — `/conquest`
+  returns three sibling keys and `/tblogs` two — so there is no single thing to unwrap to, and
+  returning it whole is the only rule definable across all 18 endpoints.
+- **api**: per-call allycodes are now cleansed like constructor allycodes.
+  `fetch_player("123-456-789")` sends `123456789`, and one that is not 9 digits raises instead
+  of reaching the server.
+- **registry**: `verify_player(primary=...)` defaults to **`None`**, not `False`, and omits the
+  key from the payload entirely when `None`. This lets the registry apply its documented
+  behaviour — a user with no other registered accounts gets `primary: yes`. The old `False`
+  default silently opted first-time users *out* of being primary. Pass `True`/`False` to state
+  it explicitly.
+- **api**: the five non-authenticated endpoints (`player`, `playerarena`, `guild`,
+  `guildleaderboard`, `database`) raise `ValidationError` when no Discord ID is set. **Only the
+  exception type changes for affected callers** — the API already rejected those requests with a
+  400, verified against the live server, so no working code breaks.
 
 ### Security
 
@@ -37,6 +63,13 @@
 - `MBot.sign()` no longer logs intermediate or final HMAC hexdigests (the final digest *is*
   the `Authorization` header value) nor the raw payload string at DEBUG level. Only the
   non-reversible payload MD5 digest and the redacted final header set are logged.
+- Secrets are masked to at most a **quarter of their length** (`len // 4` trailing characters)
+  rather than a fixed last-four. The old rule revealed 4 of a 9-digit allycode and printed a
+  4-character secret *in full*. Applied at both leak sites — `utils._redact_value` and
+  `MBot.get_api_key()`; a previous partial fix had missed the second.
+- `MBot.sign()`'s DEBUG line for a caller-supplied `api_key=` override reported the **container**
+  key while labelling it the provided one, so anyone debugging a key mismatch was reading a
+  wrong value.
 
 ### Bug Fixes
 
@@ -54,9 +87,49 @@
 - **api**: an unsigned (`hmac=False`) request issued after a signed one restores the
   plaintext `api-key` header and drops the stale `Authorization` / `x-timestamp` headers;
   previously the credential header was permanently lost after the first signed call.
+- **base**: **`x-discord-id` never reached the wire on the api-key path.** The header was
+  synced to the httpx clients only as a side effect of HMAC signing, so with `hmac=False` it was
+  never sent at all, from any path — constructor or setter. Every header mutator now calls
+  `_sync_headers()`. Since the API returns 400 without the header on non-authenticated
+  endpoints, those calls could not previously succeed under api-key auth.
+- **base**: **`cleanse_discord_id` rejected every Discord account created since ~July 2022.**
+  It required exactly 18 digits; snowflakes crossed to 19 on ~2022-07-23, and 17-digit accounts
+  predate 2016. Since `Registry` requires a `discord_id`, the registry was unusable for those
+  users. Now accepts 17–20 digits — 17 is Discord's launch floor, 20 the ceiling for an
+  unsigned 64-bit value.
+- **api**: `/guildleaderboard` payloads omitted the required `defId` for leaderboard types 4, 5
+  and 6, producing a request the API rejects with a 400. The `oneOf` coupling is now enforced
+  client-side.
+- **api**: `user_discord_id`, `hmac` and `method` were **silently discarded** by
+  `fetch_player` / `fetch_guild`, and not accepted at all by `fetch_player_arena` /
+  `fetch_guild_leaderboard`. Four of the five non-authenticated helpers therefore sent unsigned
+  requests with no `userDiscordId`. All helpers now forward `**kwargs`; an unknown keyword
+  raises `TypeError` instead of vanishing.
+- **utils**: `func_timer` and `func_debug_logger` were synchronous wrappers applied to coroutine
+  functions, so async DEBUG timings measured coroutine *construction* — microseconds for a
+  network round-trip — and `inspect.iscoroutinefunction()` reported `False` for every decorated
+  async method. Both are now async-aware. `func_timer` also moved from `time.time()` to
+  `time.perf_counter()`.
+- **docs**: the README's recommended error handler
+  (`except MBotError as exc: print(exc.status_code)`) raised `AttributeError` on any
+  `ValidationError`, which carries no response attributes.
 
 ### Features
 
+- **api**: `/guildleaderboard` `defId` values are exposed as three enums coupled to their
+  leaderboard type — `TerritoryBattleDefId` (type 4), `TerritoryWarDefId` (type 5),
+  `GuildRaidDefId` (type 6) — plus `LeaderboardType.def_id_enum` / `.requires_def_id`. One enum
+  per type rather than one flat set, so autocomplete only ever offers values legal for the type
+  already chosen.
+- **api**: calling one of the 13 authenticated endpoints emits **`SessionBreakWarning`**, once
+  per endpoint per process. Those endpoints break the player's active Star Wars: Galaxy of
+  Heroes session, which matters most for bots polling on a timer. Silence with
+  `warnings.filterwarnings("ignore", category=SessionBreakWarning)`.
+- **attrs**: `EndPoint.requires_discord_id` and `NON_AUTHENTICATED_ENDPOINTS`, alongside the
+  existing `is_authenticated` / `AUTHENTICATED_ENDPOINTS`.
+- **base**: the documented `Accept-Encoding: br,gzip,deflate` header is now sent. `httpx[brotli]`
+  is a hard dependency so the `br` offer can actually be honoured — verified decoding a real
+  brotli response on Python 3.10 through 3.14.
 - Add `MBot.close()` / `MBot.aclose()` and (async-)context-manager support
   (`with API(...) as api:` / `async with API(...) as api:`) for explicit HTTP-client
   lifecycle management.
