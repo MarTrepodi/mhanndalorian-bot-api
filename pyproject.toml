@@ -53,6 +53,17 @@ addopts = [
 testpaths = [
     "tests",
 ]
+filterwarnings = [
+    # Most tests call authenticated endpoints incidentally; the warning is the subject of only a
+    # few of them. pytest.warns installs its own filter, so the tests asserting it still pass.
+    #
+    # Matched by message rather than by the SessionBreakWarning class on purpose. Naming the class
+    # here makes pytest import mhanndalorian_bot at config time to resolve it -- before pytest-cov
+    # starts -- so every module-level statement executes unmeasured and coverage collapses from
+    # 93% to 56%. Matching the message imports nothing. (No colon in the regex: pytest splits
+    # filter strings on ':'.)
+    "ignore:.*is an authenticated endpoint:UserWarning",
+]
 
 [tool.hatch.version]
 path = 'mhanndalorian_bot/version.py'

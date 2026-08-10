@@ -38,7 +38,12 @@ def test_register_player_valid_data(httpx_mock: HTTPXMock, registry_instance):
     request = httpx_mock.get_requests()[0]
     assert request.url.path == "/api/comlink"
     sent = json.loads(request.content)
-    assert sent == {"discordId": "123456789987654321", "method": "registration", "payload": {"allyCode": "123456789"}}
+    assert sent == {
+        "discordId": "123456789987654321",
+        "method": "registration",
+        "payload": {"allyCode": "123456789"},
+        "enums": False,
+    }
     assert "authorization" in request.headers
     assert "x-timestamp" in request.headers
 
@@ -66,8 +71,9 @@ def test_verify_player_valid_data(httpx_mock: HTTPXMock, registry_instance):
     assert sent == {
         "discordId": "123456789987654321",
         "method": "verification",
-        "primary": False,
         "payload": {"allyCode": "123456789"},
+        "enums": False,
+        "primary": False,
     }
 
 
@@ -82,3 +88,41 @@ def test_verify_player_invalid_data(registry_instance):
     """Test verifying a player with invalid data."""
     with pytest.raises(ValidationError, match="Invalid"):
         registry_instance.verify_player(discord_id="", allycode="invalid_allycode", primary=False, hmac=True)
+
+
+# --- primary tri-state ---------------------------------------------------------------------------
+# The registry assigns primary=yes when a user has no other registered accounts, but only if the
+# caller leaves `primary` unspecified. Sending false -- the pre-0.11.0 default -- silently opted
+# first-time users out of that.
+
+
+def test_verify_player_omits_primary_when_unspecified(httpx_mock: HTTPXMock, registry_instance):
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789")
+    sent = json.loads(httpx_mock.get_requests()[0].content)
+    assert "primary" not in sent, "an unspecified primary must not reach the wire at all"
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_verify_player_sends_explicit_primary_as_a_json_boolean(httpx_mock: HTTPXMock, registry_instance, value):
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789", primary=value)
+    sent = json.loads(httpx_mock.get_requests()[0].content)
+    assert sent["primary"] is value
+
+
+async def test_verify_player_async_omits_primary_when_unspecified(httpx_mock: HTTPXMock, registry_instance):
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    await registry_instance.verify_player_async(discord_id="123456789987654321", allycode="123-456-789")
+    assert "primary" not in json.loads(httpx_mock.get_requests()[0].content)
+
+
+def test_all_comlink_payloads_carry_the_enums_flag(httpx_mock: HTTPXMock, registry_instance):
+    """Every documented SWGOH-Registry snippet sends enums; /comlink has no OpenAPI spec to fall
+    back on, so the README snippet is the only contract there is."""
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    registry_instance.register_player(discord_id="123456789987654321", allycode="123-456-789")
+    httpx_mock.add_response(json={"verified": True}, status_code=200)
+    registry_instance.verify_player(discord_id="123456789987654321", allycode="123-456-789")
+    for req in httpx_mock.get_requests():
+        assert json.loads(req.content)["enums"] is False

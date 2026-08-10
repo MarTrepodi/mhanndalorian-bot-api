@@ -37,11 +37,23 @@ Recommended lifecycle:
 
     ``close()`` / ``aclose()`` are available for callers managing lifecycle by hand.
 
-Breaking change in 0.11.0:
-    Input validation raises ``ValidationError``, a sibling of ``APIResponseError`` under
-    ``MBotError``. It does NOT subclass ``ValueError`` or ``TypeError``, so code written as
-    ``except ValueError:`` around library calls no longer catches. Catch ``ValidationError``
-    (or ``MBotError`` for everything the library raises).
+Breaking changes in 0.11.0:
+    1. Input validation raises ``ValidationError``, a sibling of ``APIResponseError`` under
+       ``MBotError``. It does NOT subclass ``ValueError`` or ``TypeError``, so code written as
+       ``except ValueError:`` around library calls no longer catches. Catch ``ValidationError``
+       (or ``MBotError`` for everything the library raises).
+    2. ``fetch_player`` and ``fetch_guild`` no longer strip the response envelope. They were the
+       only two helpers that ever did. Reach through ``["events"]`` (and ``["guild"]``) now.
+    3. ``Registry.verify_player(primary=...)`` defaults to ``None`` rather than ``False``; the key
+       is omitted from the payload so the registry applies its own default (primary=yes for a
+       user with no other registered accounts). The old default silently opted first-time users
+       out of being primary.
+    4. Discord IDs of 17-20 digits are accepted, not exactly 18. This only widens what is allowed
+       -- but note the old rule rejected every account created since ~July 2022 (19 digits),
+       making Registry unusable for those users.
+
+    Calls to the 13 authenticated endpoints now emit ``SessionBreakWarning``, once per endpoint
+    per process. Not breaking, but visible; silence with ``warnings.filterwarnings``.
 
 Logging:
     This package emits records under the ``mhanndalorian_bot`` logger hierarchy and attaches a
@@ -69,6 +81,7 @@ from .exceptions import (
     AuthorizationError,
     BadRequestError,
     MBotError,
+    SessionBreakWarning,
     ValidationError,
 )
 from .registry import Registry
@@ -84,6 +97,7 @@ __all__ = [
     "GuildRaidDefId",
     "LeaderboardType",
     "MBotError",
+    "SessionBreakWarning",
     "Registry",
     "TerritoryBattleDefId",
     "TerritoryWarDefId",

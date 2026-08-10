@@ -1,11 +1,13 @@
 # tests/test_api.py
 import json
+import warnings
 
 import pytest
 from pytest_httpx import HTTPXMock
 
 from mhanndalorian_bot.api import API
 from mhanndalorian_bot.attrs import (
+    AUTHENTICATED_ENDPOINTS,
     DEF_ID_ENUM_BY_LEADERBOARD_TYPE,
     EndPoint,
     GuildRaidDefId,
@@ -13,7 +15,7 @@ from mhanndalorian_bot.attrs import (
     TerritoryBattleDefId,
     TerritoryWarDefId,
 )
-from mhanndalorian_bot.exceptions import ValidationError
+from mhanndalorian_bot.exceptions import SessionBreakWarning, ValidationError
 
 api_instance = API("mock_api_key", "123456789")
 
@@ -78,14 +80,15 @@ async def test_named_helpers_async_hit_expected_endpoint(httpx_mock: HTTPXMock, 
 def test_fetch_player_by_allycode(httpx_mock: HTTPXMock):
     httpx_mock.add_response(json={"events": {"name": "player"}}, status_code=200)
     result = api_instance.fetch_player("987654321")
-    assert result == {"name": "player"}
+    # Envelope returned intact -- fetch_player stopped unwrapping in 0.11.0.
+    assert result == {"events": {"name": "player"}}
     assert sent_payload(httpx_mock)["payload"]["allyCode"] == "987654321"
 
 
 def test_fetch_player_by_player_id(httpx_mock: HTTPXMock):
     httpx_mock.add_response(json={"events": {"name": "player"}}, status_code=200)
     result = api_instance.fetch_player(player_id="PID123")
-    assert result == {"name": "player"}
+    assert result == {"events": {"name": "player"}}
     payload = sent_payload(httpx_mock)["payload"]
     assert payload["playerId"] == "PID123"
     assert "allyCode" not in payload
@@ -121,7 +124,7 @@ def test_fetch_player_arena_by_allycode(httpx_mock: HTTPXMock):
 def test_fetch_guild(httpx_mock: HTTPXMock):
     httpx_mock.add_response(json={"events": {"guild": {"name": "guild"}}}, status_code=200)
     result = api_instance.fetch_guild("GUILD_ID")
-    assert result == {"name": "guild"}
+    assert result == {"events": {"guild": {"name": "guild"}}}
     assert sent_payload(httpx_mock)["payload"]["guildId"] == "GUILD_ID"
 
 
@@ -551,3 +554,59 @@ async def test_guild_id_rejected_as_validation_error_async(httpx_mock: HTTPXMock
     with pytest.raises(ValidationError, match=message):
         await api_instance.fetch_guild_async(bad_guild_id)
     assert httpx_mock.get_requests() == []
+
+
+# --- response envelope --------------------------------------------------------------------------
+# Decided in 0.11.0: no helper unwraps. The envelope is not uniform across endpoints -- /conquest
+# has three sibling keys and /tblogs has two -- so "always unwrap" is not definable as a rule.
+
+
+def test_no_helper_strips_the_response_envelope(httpx_mock: HTTPXMock):
+    """fetch_player and fetch_guild were the only two that ever unwrapped; now nothing does."""
+    envelope = {"code": 0, "events": {"guild": {"name": "guild"}}}
+    httpx_mock.add_response(json=envelope, status_code=200)
+    assert api_instance.fetch_guild("GUILD_ID") == envelope
+
+    httpx_mock.add_response(json={"code": 0, "events": {"name": "p"}}, status_code=200)
+    assert api_instance.fetch_player("987654321") == {"code": 0, "events": {"name": "p"}}
+
+
+def test_multi_key_envelopes_survive_intact(httpx_mock: HTTPXMock):
+    """/conquest returns three sibling keys -- the case that makes 'always unwrap' undefinable."""
+    envelope = {"code": 0, "conquestStatus": {}, "challengeProgress": {}, "nodePreviews": []}
+    httpx_mock.add_response(json=envelope, status_code=200)
+    assert api_instance.fetch_conquest() == envelope
+
+
+# --- session-breaking warning -------------------------------------------------------------------
+
+
+def test_authenticated_endpoint_warns(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(json={"code": 0}, status_code=200)
+    with pytest.warns(SessionBreakWarning, match="inventory"):
+        api_instance.fetch_inventory()
+
+
+def test_non_authenticated_endpoint_does_not_warn(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(json={"code": 0, "events": {}}, status_code=200)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SessionBreakWarning)
+        api_instance.fetch_player("987654321")
+
+
+async def test_authenticated_endpoint_warns_async(httpx_mock: HTTPXMock):
+    httpx_mock.add_response(json={"code": 0}, status_code=200)
+    with pytest.warns(SessionBreakWarning, match="tw"):
+        await api_instance.fetch_tw_async()
+
+
+def test_warning_names_every_authenticated_endpoint_and_no_others():
+    """The warning must fire for exactly the 13 endpoints the spec tags Authenticated."""
+    warned = set()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        for member in EndPoint:
+            API._warn_if_session_breaking(member)
+        for rec in caught:
+            warned.add(str(rec.message).split("'")[1])
+    assert warned == set(AUTHENTICATED_ENDPOINTS)

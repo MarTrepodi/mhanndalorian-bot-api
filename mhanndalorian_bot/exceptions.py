@@ -17,9 +17,23 @@ __all__ = [
     "AuthorizationError",
     "BadRequestError",
     "MBotError",
+    "SessionBreakWarning",
     "ValidationError",
     "raise_for_response",
 ]
+
+
+class SessionBreakWarning(UserWarning):
+    """Emitted when a call to an authenticated endpoint will end the player's game session.
+
+    Spec v1.0.1 tags 13 endpoints Authenticated -- "Will break the session of the user." This is a
+    real, user-visible consequence for a bot polling on a timer, so the library says so at runtime
+    rather than only in a docstring.
+
+    Silence it the usual way::
+
+        warnings.filterwarnings("ignore", category=SessionBreakWarning)
+    """
 
 
 class MBotError(RuntimeError):

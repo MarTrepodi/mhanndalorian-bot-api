@@ -119,7 +119,7 @@ class Registry(MBot):
         allycode = self.cleanse_allycode(allycode)
         discord_id = self.cleanse_discord_id(discord_id)
 
-        payload = dict(discordId=discord_id, method="registration", payload={"allyCode": allycode})
+        payload = dict(discordId=discord_id, method="registration", payload={"allyCode": allycode}, enums=False)
         endpoint = f"/api/{EndPoint.REGISTER.value}"
 
         if hmac or self.hmac is True:
@@ -134,7 +134,7 @@ class Registry(MBot):
         raise_for_response(resp, endpoint)
 
     @func_timer
-    def verify_player(self, discord_id: str, allycode: str, *, primary: bool = False, hmac: bool = False) -> bool:
+    def verify_player(self, discord_id: str, allycode: str, *, primary: bool | None = None, hmac: bool = False) -> bool:
         """Perform player portrait and title verification after register_player() has been called.
 
         Args
@@ -142,8 +142,10 @@ class Registry(MBot):
             allycode: Player allycode as a string.
 
         Keyword Args
-            primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
-                        in cases where multiple allycodes are registered to the same discord ID.
+            primary: Whether this allycode should be the primary for the discord ID when several are
+                        registered to it. Leave as None (the default) to let the registry decide: it
+                        assigns primary=yes when the user has no other registered accounts. Pass True
+                        or False to state it explicitly..
             hmac: Boolean flag to indicate use of HMAC request signing.
 
         Returns
@@ -156,7 +158,14 @@ class Registry(MBot):
         allycode = self.cleanse_allycode(allycode)
         discord_id = self.cleanse_discord_id(discord_id)
 
-        payload = dict(discordId=discord_id, method="verification", primary=primary, payload={"allyCode": allycode})
+        payload: dict[str, Any] = dict(
+            discordId=discord_id, method="verification", payload={"allyCode": allycode}, enums=False
+        )
+        # `primary` is omitted entirely when None so the registry applies its documented default:
+        # a user with no other registered accounts gets primary=yes. Sending `false` here -- as
+        # this library did before 0.11.0 -- silently opted first-time users out of that.
+        if primary is not None:
+            payload["primary"] = primary
         endpoint = f"/api/{EndPoint.VERIFY.value}"
 
         if hmac or self.hmac is True:
@@ -223,7 +232,7 @@ class Registry(MBot):
         allycode = self.cleanse_allycode(allycode)
         discord_id = self.cleanse_discord_id(discord_id)
 
-        payload = dict(discordId=discord_id, method="registration", payload={"allyCode": allycode})
+        payload = dict(discordId=discord_id, method="registration", payload={"allyCode": allycode}, enums=False)
         endpoint = f"/api/{EndPoint.REGISTER.value}"
 
         if hmac or self.hmac is True:
@@ -239,7 +248,7 @@ class Registry(MBot):
 
     @func_timer
     async def verify_player_async(
-        self, discord_id: str, allycode: str, *, primary: bool = False, hmac: bool = False
+        self, discord_id: str, allycode: str, *, primary: bool | None = None, hmac: bool = False
     ) -> bool:
         """Perform player portrait and title verification
 
@@ -248,8 +257,10 @@ class Registry(MBot):
             allycode: Player allycode as a string
 
         Keyword Args
-            primary: Boolean indicating whether this allycode should be used as the primary for the discord ID
-                        in cases where multiple allycodes are registered to the same discord ID
+            primary: Whether this allycode should be the primary for the discord ID when several are
+                        registered to it. Leave as None (the default) to let the registry decide: it
+                        assigns primary=yes when the user has no other registered accounts. Pass True
+                        or False to state it explicitly.
             hmac: Boolean flag to indicate use of HMAC request signing. Default: False.
 
         Returns
@@ -262,7 +273,14 @@ class Registry(MBot):
         allycode = self.cleanse_allycode(allycode)
         discord_id = self.cleanse_discord_id(discord_id)
 
-        payload = dict(discordId=discord_id, method="verification", primary=primary, payload={"allyCode": allycode})
+        payload: dict[str, Any] = dict(
+            discordId=discord_id, method="verification", payload={"allyCode": allycode}, enums=False
+        )
+        # `primary` is omitted entirely when None so the registry applies its documented default:
+        # a user with no other registered accounts gets primary=yes. Sending `false` here -- as
+        # this library did before 0.11.0 -- silently opted first-time users out of that.
+        if primary is not None:
+            payload["primary"] = primary
         endpoint = f"/api/{EndPoint.VERIFY.value}"
 
         if hmac or self.hmac is True:
