@@ -13,7 +13,8 @@ jobs:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      # Read-only: tagging moved to its own job, gated behind a successful publish.
+      contents: read
 
     steps:
       # Checkout the code
@@ -51,17 +52,6 @@ jobs:
           name: dist
           path: dist/
 
-      # Tag the release in GitHub
-      - name: Tag the release
-        run: |
-          VERSION=$(uvx hatch version)
-          git config user.name "$(git log -n 1 --pretty=format:%an)"
-          git config user.email "$(git log -n 1 --pretty=format:%ae)"
-          git tag -a "v$VERSION" -m "Release version $VERSION"
-          git push origin "v$VERSION"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       # Update CHANGELOG.md
       - name: Update CHANGELOG.md
         run: |
@@ -91,3 +81,44 @@ jobs:
 
       - name: Publish release distributions to PyPI
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247
+
+  # Tag only once the publish has succeeded.
+  #
+  # This was a step inside `release`, running before the artifact was even uploaded and long
+  # before PyPI saw anything -- so a failure in any later step left a tag behind for a release
+  # that never happened. That is exactly what befell v0.11.0: the tag was pushed, the next step
+  # failed, and the `tag-release` ruleset forbids deleting tags, so it could not be undone. A
+  # tag now means the release completed.
+  tag:
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs:
+      - release
+      - pypi-publish
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Tag the release
+        run: |
+          VERSION=$(uvx hatch version)
+          # Idempotent: v0.11.0 already exists from the run that failed mid-release, and the
+          # `tag-release` ruleset forbids deleting a tag to clear the way.
+          if git ls-remote --exit-code --tags origin "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists on origin; leaving it as is."
+          else
+            git config user.name "$(git log -n 1 --pretty=format:%an)"
+            git config user.email "$(git log -n 1 --pretty=format:%ae)"
+            git tag -a "v$VERSION" -m "Release version $VERSION"
+            git push origin "v$VERSION"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
