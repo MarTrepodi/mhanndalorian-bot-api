@@ -118,6 +118,6 @@ provider = "github"
 repository = "."
 sections = "fix,feat,refactor,chore,doc,test"
 template = "keepachangelog"
-version-regex = "^## \\\\[(?P<version>v?[^\\\\]]+)"
+version-regex = "^## \\[(?P<version>v?[^\\]]+)"
 versioning = "semver"
 zerover = true
