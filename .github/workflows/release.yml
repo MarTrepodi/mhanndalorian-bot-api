@@ -9,8 +9,60 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  # Decide whether this version needs releasing at all.
+  #
+  # `release.yml` fires on every merged PR into main, not on version changes -- so a promotion
+  # that carries a CI fix or a docs change re-runs the whole release for a version already on
+  # PyPI, and the publish fails on a duplicate. This job answers the question once, up front,
+  # and the rest of the workflow is gated on it.
+  #
+  # Deliberately fails on anything other than a clean 200 or 404. A silently-skipped publish
+  # would mask a real problem -- PyPI being unreachable must not look like "already released".
+  check:
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.probe.outputs.version }}
+      should_release: ${{ steps.probe.outputs.should_release }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Is this version already on PyPI?
+        id: probe
+        run: |
+          # Read the distribution name from pyproject rather than hard-coding it, so a rename
+          # cannot silently turn the guard into a no-op that always says "not released".
+          PKG=$(grep -m1 '^name = ' pyproject.toml | cut -d'"' -f2)
+          VERSION=$(uvx hatch version)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 2 \
+                   "https://pypi.org/pypi/$PKG/$VERSION/json")
+          case "$CODE" in
+            404)
+              echo "should_release=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::$PKG $VERSION is not on PyPI; proceeding with the release."
+              ;;
+            200)
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              echo "::notice::$PKG $VERSION is already on PyPI. Nothing to release; bump the version to cut a new one."
+              ;;
+            *)
+              echo "::error::Unexpected HTTP $CODE from PyPI for $PKG $VERSION. Refusing to guess whether this version is published."
+              exit 1
+              ;;
+          esac
+
+  release:
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       # Read-only: tagging moved to its own job, gated behind a successful publish.
@@ -59,9 +111,10 @@ jobs:
 
   # Publish the package to PyPI
   pypi-publish:
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     needs:
+      - check
       - release
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
@@ -90,9 +143,10 @@ jobs:
   # failed, and the `tag-release` ruleset forbids deleting tags, so it could not be undone. A
   # tag now means the release completed.
   tag:
-    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    if: needs.check.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     needs:
+      - check
       - release
       - pypi-publish
     permissions:
