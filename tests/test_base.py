@@ -340,3 +340,31 @@ def test_every_header_mutator_syncs_to_the_clients():
     for key, value in bot.headers.items():
         assert bot.client.headers[key] == value, f"{key} not synced to sync client"
         assert bot.aclient.headers[key] == value, f"{key} not synced to async client"
+
+
+# --- subclass resolution ------------------------------------------------------------------------
+# __enter__/__aenter__ were annotated `-> MBot`, so `with API(...) as api:` handed back the base
+# class and every fetch_* method became unresolvable to a type checker -- in exactly the form the
+# README and all four examples recommend. These pin the runtime half of that contract.
+
+
+def test_context_manager_yields_the_subclass_not_the_base():
+    with API(api_key="12345678abcdefgh", allycode="123456789", discord_id="123456789012345678") as api:
+        assert type(api) is API
+        assert hasattr(api, "fetch_inventory")
+
+
+async def test_async_context_manager_yields_the_subclass_not_the_base():
+    async with API(api_key="12345678abcdefgh", allycode="123456789", discord_id="123456789012345678") as api:
+        assert type(api) is API
+        assert hasattr(api, "fetch_inventory")
+
+
+def test_descriptor_returns_the_value_on_an_instance_and_itself_on_the_class():
+    from mhanndalorian_bot.attrs import APIKey
+
+    bot = make_bot()
+    assert isinstance(bot.api_key, str)
+    assert isinstance(bot.allycode, str)
+    # class access must yield the descriptor, which is what the overload pair encodes
+    assert isinstance(MBot.__dict__["api_key"], APIKey)

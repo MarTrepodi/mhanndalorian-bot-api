@@ -5,7 +5,7 @@ Attribute definitions
 import logging
 from abc import ABC, abstractmethod
 from enum import Enum, IntEnum
-from typing import Any
+from typing import Any, overload
 
 from mhanndalorian_bot.exceptions import ValidationError
 
@@ -31,19 +31,33 @@ logger = logging.getLogger(__name__)
 
 
 class ManagedAttribute(ABC):
-    def __set_name__(self, owner, name):
+    def __set_name__(self, owner: type[Any], name: str) -> None:
         self.private_name = "_" + name
 
-    def __get__(self, obj, objtype=None):
+    @overload
+    def __get__(self, obj: None, objtype: type[Any] | None = None) -> "ManagedAttribute": ...
+
+    @overload
+    def __get__(self, obj: object, objtype: type[Any] | None = None) -> str: ...
+
+    def __get__(self, obj: object | None, objtype: type[Any] | None = None) -> "ManagedAttribute | str":
+        """Typed so `api.api_key` resolves to `str` rather than `Unknown`.
+
+        Two overloads because class access and instance access return different things:
+        `API.api_key` is the descriptor itself, `api.api_key` is the stored value. Without
+        annotations a type checker gives up on both and an IDE offers nothing.
+        """
+        if obj is None:
+            return self
         return getattr(obj, self.private_name)
 
-    def __set__(self, obj, value):
+    def __set__(self, obj: object, value: Any) -> None:
         self.validate(value)
         logger.debug(f"Setting {self.private_name!r} to {value!r} for object {obj!r}")
         setattr(obj, self.private_name, value)
 
     @abstractmethod
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         pass
 
 
@@ -51,7 +65,7 @@ class APIKey(ManagedAttribute):
     def __init__(self, api_key=None):
         self.api_key = api_key
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, str):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
 
@@ -60,7 +74,7 @@ class AllyCode(ManagedAttribute, str):
     def __init__(self, allycode=None):
         self.allycode = allycode
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, str):
             raise ValidationError(f"{value} must be a string, not type:{type(value)}")
         if not value.isdigit() or len(value) != 9:
@@ -71,7 +85,7 @@ class Debug(ManagedAttribute):
     def __init__(self, debug: bool = False):
         self.debug = debug
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, bool):
             raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
 
@@ -80,7 +94,7 @@ class HMAC(ManagedAttribute):
     def __init__(self, hmac: bool = True):
         self.hmac = hmac
 
-    def validate(self, value):
+    def validate(self, value: Any) -> None:
         if not isinstance(value, bool):
             raise ValidationError(f"{value} must be a boolean, not type:{type(value)}")
 
