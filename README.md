@@ -125,11 +125,7 @@ except APIResponseError as exc:     # any other non-200 (400, 403, 5xx, ...)
 `except MBotError:` is still the right catch-all when you only need "something went wrong" and
 won't touch response attributes.
 
-#### Upgrading from 0.9.x / 0.10.x
-
-> v0.10.0 was tagged but never published to PyPI, so `pip install mhanndalorian-bot` has been
-> serving 0.9.0. If you installed from PyPI you are upgrading from **0.9.0**, and the v0.10.0
-> changes in [CHANGELOG.md](CHANGELOG.md) apply to you as well as the ones below.
+#### Upgrading from 0.10.x
 
 `ValidationError` does **not** subclass `ValueError` or `TypeError`. Handlers that previously
 caught those around library calls silently stop catching:
