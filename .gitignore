@@ -6,6 +6,7 @@ __pycache__/
 
 # Generated OpenAPI/Redoc documentation output
 docs/
+CONTEXT.md
 
 # Secrets — never commit any of these
 .env
@@ -14,3 +15,10 @@ docs/
 *.key
 secrets/
 setenv.sh
+
+# Large raw territory-log capture (golden slice lives in tests/fixtures/)
+/data/twlogs_20251207.json
+
+# Test fixtures are tracked despite the broad *.json ignore above
+!tests/fixtures/
+!tests/fixtures/*.json
