@@ -83,6 +83,7 @@ class Registry(MBot):
             Dictionary from JSON response, if found. Else None.
         """
 
+        self._require_discord_id(EndPoint.FETCH)
         user_identifier = self.validate_arguments(allycode, discord_id)
         payload = {"user": [user_identifier], "endpoint": "find"}
         endpoint = f"/api/{EndPoint.FETCH.value}"
@@ -196,6 +197,7 @@ class Registry(MBot):
             Dictionary from JSON response, if found. Else None.
         """
 
+        self._require_discord_id(EndPoint.FETCH)
         user_identifier = self.validate_arguments(allycode, discord_id)
         payload = {"user": [user_identifier], "endpoint": "find"}
         endpoint = f"/api/{EndPoint.FETCH.value}"

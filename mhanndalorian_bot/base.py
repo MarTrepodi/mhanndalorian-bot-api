@@ -15,7 +15,7 @@ from typing import Any
 import httpx
 from sentinels import Sentinel
 
-from mhanndalorian_bot.attrs import AllyCode, APIKey, EndPoint
+from mhanndalorian_bot.attrs import NON_AUTHENTICATED_ENDPOINTS, AllyCode, APIKey, EndPoint
 from mhanndalorian_bot.exceptions import ValidationError
 from mhanndalorian_bot.utils import func_debug_logger, func_timer, redact_secret
 
@@ -118,6 +118,31 @@ class MBot:
 
         if isinstance(hmac, bool):
             self.hmac = hmac
+
+    def _require_discord_id(self, endpoint: EndPoint | str) -> None:
+        """Reject a call to a non-authenticated endpoint when no Discord ID is set.
+
+        Spec v1.0.1 requires ``x-discord-id`` on all five Non-authenticated endpoints, and the
+        server enforces it: /player and /guild were both observed returning 400 without the header
+        and 200 with it.
+
+        Failing here rather than letting the 400 happen does not break any caller -- a request that
+        would trip this check is already failing against the server today. It replaces a wasted
+        round-trip and a generic BadRequestError with a local error that names the fix.
+
+        Endpoints outside NON_AUTHENTICATED_ENDPOINTS are not gated, including undocumented slugs
+        passed straight to fetch_data and the registry's own /comlink, which carries its Discord ID
+        in the payload instead.
+        """
+        slug = endpoint.value if isinstance(endpoint, EndPoint) else str(endpoint).strip("/").removeprefix("api/")
+        if slug not in NON_AUTHENTICATED_ENDPOINTS:
+            return
+        if not self.headers.get("x-discord-id"):
+            raise ValidationError(
+                f"'{slug}' requires a Discord ID: the API rejects non-authenticated endpoints "
+                f"without the 'x-discord-id' header. Pass discord_id= to the constructor, set the "
+                f"MHANN_DISCORD_ID environment variable, or call set_discord_id()."
+            )
 
     def _sync_headers(self) -> None:
         """Push ``self.headers`` onto both httpx clients.
