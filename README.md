@@ -1,5 +1,10 @@
 # Mhanndalorian_Bot
 
+> [!WARNING]
+> **This project is no longer actively maintained.**
+> No new features, bug fixes, or updates for changes to the Mhanndalorian Bot API are planned.
+> The library and its existing releases remain available as-is, but use it at your own risk.
+
 Mhanndalorian_Bot is a Python library for interacting with the SWGOH Mhanndalorian Bot authenticated API and Player Registry endpoints.
 
 See <https://mhanndalorianbot.work/apidocs.html> for the full API reference.
